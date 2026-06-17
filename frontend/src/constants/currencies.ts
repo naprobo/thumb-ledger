@@ -1,0 +1,43 @@
+export interface CurrencyOption {
+  code: string
+  name: string
+}
+
+export const CURRENCY_OPTIONS: CurrencyOption[] = [
+  { code: 'JPY', name: 'Japanese yen' },
+  { code: 'CNY', name: 'Chinese yuan' },
+  { code: 'USD', name: 'US dollar' },
+  { code: 'EUR', name: 'Euro' },
+  { code: 'GBP', name: 'Pound sterling' },
+  { code: 'KRW', name: 'South Korean won' },
+  { code: 'TWD', name: 'New Taiwan dollar' },
+  { code: 'HKD', name: 'Hong Kong dollar' },
+  { code: 'SGD', name: 'Singapore dollar' },
+  { code: 'AUD', name: 'Australian dollar' },
+  { code: 'CAD', name: 'Canadian dollar' },
+  { code: 'CHF', name: 'Swiss franc' },
+  { code: 'NZD', name: 'New Zealand dollar' },
+  { code: 'THB', name: 'Thai baht' },
+  { code: 'VND', name: 'Vietnamese dong' },
+  { code: 'IDR', name: 'Indonesian rupiah' },
+  { code: 'MYR', name: 'Malaysian ringgit' },
+  { code: 'PHP', name: 'Philippine peso' },
+  { code: 'INR', name: 'Indian rupee' },
+  { code: 'BRL', name: 'Brazilian real' },
+  { code: 'MXN', name: 'Mexican peso' },
+  { code: 'ZAR', name: 'South African rand' },
+  { code: 'SEK', name: 'Swedish krona' },
+  { code: 'NOK', name: 'Norwegian krone' },
+  { code: 'DKK', name: 'Danish krone' },
+  { code: 'PLN', name: 'Polish zloty' },
+  { code: 'CZK', name: 'Czech koruna' },
+  { code: 'HUF', name: 'Hungarian forint' },
+  { code: 'TRY', name: 'Turkish lira' },
+  { code: 'AED', name: 'UAE dirham' },
+  { code: 'SAR', name: 'Saudi riyal' },
+  { code: 'ILS', name: 'Israeli new shekel' },
+]
+
+export function currencyOptionLabel(option: CurrencyOption): string {
+  return `${option.code} - ${option.name}`
+}
