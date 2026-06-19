@@ -25,7 +25,7 @@ describe('SummaryView', () => {
     await router.isReady()
 
     const wrapper = mount(SummaryView, { global: { plugins: [router] } })
-    await vi.waitFor(() => expect(wrapper.text()).toContain('食物'))
+    await vi.waitFor(() => expect(wrapper.text()).toContain('食品饮料'))
 
     expect(wrapper.text()).toContain('1,200 JPY')
     expect(wrapper.text()).toContain('自己')

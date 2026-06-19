@@ -76,10 +76,10 @@ describe('WizardFlow', () => {
           necessity_step_mode: 'disabled',
         }),
       ),
-    ).toEqual(['amount', 'item'])
+    ).toEqual(['amount', 'category'])
   })
 
-  it('keeps receipt-mode item name selection before necessity', () => {
+  it('keeps receipt-mode category selection before necessity', () => {
     expect(
       buildWizardSteps(
         ledger({
@@ -89,7 +89,7 @@ describe('WizardFlow', () => {
           necessity_step_mode: 'required',
         }),
       ),
-    ).toEqual(['amount', 'item', 'necessity'])
+    ).toEqual(['amount', 'category', 'necessity'])
   })
 
   it('renders a custom amount keypad instead of relying on the system numeric keyboard', async () => {
@@ -142,11 +142,19 @@ describe('WizardFlow', () => {
 
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
 
     await vi.waitFor(() => expect(createTransaction).toHaveBeenCalledTimes(1))
     expect(vi.mocked(createTransaction).mock.calls[0][1].transaction_date).toBe('2026-06-16')
+    expect(vi.mocked(createTransaction).mock.calls[0][1].items).toEqual([
+      {
+        category_name: 'category.food',
+        item_name: undefined,
+        amount: 1,
+        currency_code: 'JPY',
+      },
+    ])
   })
 
   it('opens a large app calendar and applies the selected date immediately', async () => {
@@ -175,8 +183,8 @@ describe('WizardFlow', () => {
 
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
 
     await vi.waitFor(() => expect(createTransaction).toHaveBeenCalledTimes(1))
     expect(vi.mocked(createTransaction).mock.calls[0][1].transaction_date).toBe('2026-06-12')
@@ -194,7 +202,7 @@ describe('WizardFlow', () => {
     await wrapper.findAll('.keypad button').find((button) => button.text() === '3')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === '4')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食物')?.trigger('click')
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '不花不行')?.trigger('click')
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '自己')?.trigger('click')
@@ -237,7 +245,7 @@ describe('WizardFlow', () => {
     expect(wrapper.find('.keypad').exists()).toBe(true)
   })
 
-  it('advances from receipt amount to item tags before necessity', async () => {
+  it('advances from receipt amount to category before necessity', async () => {
     const wrapper = mount(WizardFlow, {
       props: {
         ledger: ledger({
@@ -252,11 +260,11 @@ describe('WizardFlow', () => {
 
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
 
     expect(wrapper.text()).not.toContain('不花不行')
     expect(wrapper.text()).not.toContain('保存')
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     expect(wrapper.text()).toContain('不花不行')
     expect(wrapper.findAll('.chip-grid .selected')).toHaveLength(0)
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '不花不行')?.trigger('click')
@@ -280,8 +288,8 @@ describe('WizardFlow', () => {
 
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.text()).toContain('不花不行'))
 
     expect(wrapper.findAll('.chip-grid .selected')).toHaveLength(0)
@@ -314,8 +322,8 @@ describe('WizardFlow', () => {
 
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.text()).toContain('不花不行'))
 
     expect(wrapper.text()).toContain('其实可以不花')
@@ -337,8 +345,8 @@ describe('WizardFlow', () => {
 
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.find('.wizard-titlebar h2').text()).toBe('花费对象'))
 
     expect(wrapper.find('.subject-confirm').attributes('disabled')).toBeDefined()
@@ -366,8 +374,8 @@ describe('WizardFlow', () => {
 
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.find('.wizard-titlebar h2').text()).toBe('花费对象'))
 
     const text = wrapper.text()
@@ -390,8 +398,8 @@ describe('WizardFlow', () => {
 
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.find('.wizard-titlebar h2').text()).toBe('花费对象'))
 
     await wrapper.findAll('.add-chip').find((button) => button.text().includes('自定义'))?.trigger('click')
@@ -420,8 +428,8 @@ describe('WizardFlow', () => {
 
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.find('.wizard-titlebar h2').text()).toBe('花费对象'))
 
     await wrapper.find('.title-action-button').trigger('click')
@@ -446,8 +454,8 @@ describe('WizardFlow', () => {
 
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '米')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.text()).toContain('关闭此步骤'))
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '关闭此步骤')?.trigger('click')
     await wrapper.setProps({
@@ -482,7 +490,7 @@ describe('WizardFlow', () => {
     await vi.waitFor(() => expect(wrapper.find('.keypad').exists()).toBe(true))
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
-    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食物')?.trigger('click')
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
 
     expect(wrapper.find('.custom-item-field input').exists()).toBe(false)
@@ -495,7 +503,7 @@ describe('WizardFlow', () => {
     const wrapper = mount(WizardFlow, {
       props: {
         ledger: ledger({
-          entry_mode: 'receipt',
+          entry_mode: 'item',
           subject_enabled: false,
           subject_step_mode: 'disabled',
           necessity_step_mode: 'disabled',
@@ -505,6 +513,8 @@ describe('WizardFlow', () => {
     await vi.waitFor(() => expect(wrapper.find('.keypad').exists()).toBe(true))
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
 
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '自定义')?.trigger('click')
@@ -516,6 +526,8 @@ describe('WizardFlow', () => {
     await vi.waitFor(() => expect(wrapper.find('.keypad').exists()).toBe(true))
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.text()).toContain('咖啡'))
   })
 })

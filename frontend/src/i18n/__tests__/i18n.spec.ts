@@ -42,7 +42,9 @@ describe('i18n infrastructure', () => {
     setLocale('zh-CN')
     const t = i18n.global.t
 
-    expect(translateLabel('category.housing', t)).toBe('房租房贷')
+    expect(translateLabel('category.food', t)).toBe('食品饮料')
+    expect(translateLabel('category.vehicle', t)).toBe('汽车用车')
+    expect(translateLabel('category.housing', t)).toBe('居住')
     expect(translateLabel('item.rent', t)).toBe('房租')
     expect(translateLabel('item.mortgage', t)).toBe('房贷')
     expect(translateLabel('category.housing', t)).not.toBe('category.housing')
