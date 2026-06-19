@@ -504,10 +504,12 @@ button:disabled {
 }
 
 :deep(.choice-button) {
+  width: 100%;
+  min-width: 0;
   min-height: 96px;
   border-radius: 8px;
   padding: 10px 12px;
-  font-size: 1.05rem;
+  font-size: clamp(0.88rem, 2.8vw, 1.05rem);
   font-weight: 800;
   line-height: 1.25;
   white-space: normal;
@@ -517,6 +519,8 @@ button:disabled {
 :deep(.choice-button .v-btn__content) {
   min-width: 0;
   white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 :deep(.selected.choice-button) {
