@@ -67,6 +67,7 @@ import { useI18n } from 'vue-i18n'
 import { CalendarDays, ChevronLeft, X } from '@lucide/vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import { enUS, ja, zhCN } from 'date-fns/locale'
+import { currencyFractionDigits } from '@/utils/money'
 import '@vuepic/vue-datepicker/dist/main.css'
 
 const props = defineProps<{ amount: number | null; currencyCode: string; transactionDate: string }>()
@@ -75,7 +76,7 @@ const emit = defineEmits<{
   dateChange: [value: string]
 }>()
 const { t, locale } = useI18n()
-const amountText = ref(props.amount ? String(props.amount) : '')
+const amountText = ref('')
 const localCurrency = ref(props.currencyCode)
 const isCalendarOpen = ref(false)
 const digitKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
@@ -99,7 +100,7 @@ const datepickerWeekStart = computed(() => (locale.value === 'en' ? 0 : 1))
 
 watch(() => props.amount, (value) => {
   amountText.value = value ? formatMinorAmount(value, fractionDigits.value) : ''
-})
+}, { immediate: true })
 
 watch(() => props.currencyCode, (value) => {
   localCurrency.value = value
@@ -161,11 +162,6 @@ function emitChange() {
 function triggerKeyFeedback() {
   if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return
   navigator.vibrate(8)
-}
-
-function currencyFractionDigits(currencyCode: string): number {
-  const zeroDecimalCurrencies = new Set(['BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KMF', 'KRW', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'])
-  return zeroDecimalCurrencies.has(currencyCode.toUpperCase()) ? 0 : 2
 }
 
 function parseMinorAmount(value: string, scale: number): number | null {
