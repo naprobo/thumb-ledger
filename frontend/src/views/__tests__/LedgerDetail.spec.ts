@@ -49,14 +49,38 @@ vi.mock('@/api/transactions', () => ({
         transaction_date: '2026-06-12',
         necessity: 'essential',
         note: 'Lunch',
-        items: [{ id: 'item-1', category_name_snapshot: '食物', item_name: '咖啡', amount: 1200, currency_code: 'JPY' }],
+        items: [{ id: 'item-1', category_name_snapshot: 'category.food', item_name: 'item.cafe', amount: 1200, currency_code: 'JPY' }],
+        transaction_subjects: [{ subject_id: 'subject-1' }],
+      },
+      {
+        id: 'txn-2',
+        ledger_id: 'ledger-1',
+        entry_mode_snapshot: 'receipt',
+        amount: 800,
+        currency_code: 'JPY',
+        transaction_date: '2026-06-14',
+        necessity: 'essential',
+        note: '',
+        items: [{ id: 'item-2', category_name_snapshot: 'category.transport', item_name: 'item.train', amount: 800, currency_code: 'JPY' }],
+        transaction_subjects: [{ subject_id: 'subject-1' }],
+      },
+      {
+        id: 'txn-3',
+        ledger_id: 'ledger-1',
+        entry_mode_snapshot: 'receipt',
+        amount: 600,
+        currency_code: 'JPY',
+        transaction_date: '2026-06-14',
+        necessity: 'non-essential',
+        note: '',
+        items: [{ id: 'item-3', category_name_snapshot: 'category.food', item_name: 'item.restaurant', amount: 600, currency_code: 'JPY' }],
         transaction_subjects: [{ subject_id: 'subject-1' }],
       },
     ],
     page: 1,
     page_size: 50,
-    total: 1,
-    page_total_amounts: { JPY: 1200 },
+    total: 3,
+    page_total_amounts: { JPY: 2600 },
   })),
   createTransaction: vi.fn(),
 }))
@@ -125,16 +149,21 @@ describe('LedgerDetail', () => {
     expect(wrapper.find('.budget-panel.soft').exists()).toBe(true)
     expect(wrapper.text()).toContain('消费记录')
     expect(wrapper.text()).toContain('本月合计')
+    expect(wrapper.text()).toContain('分类金额占比')
     expect(wrapper.text()).not.toContain('transaction.list')
     expect(wrapper.text()).not.toContain('transaction.monthTotal')
     expect(wrapper.text()).toContain('咖啡')
     expect(wrapper.text()).toContain('Lunch')
     expect(wrapper.text()).toContain('1,200 JPY')
+    expect(wrapper.text()).toContain('2,600 JPY')
+    expect(wrapper.text()).toContain('当天合计 1,400 JPY')
     expect(wrapper.text()).not.toContain('1 / 1')
     expect(wrapper.findAll('.month-nav button')).toHaveLength(2)
     expect(wrapper.find('.transaction-list li').classes()).not.toContain('transaction-meta')
-    expect(wrapper.find('.transaction-name').text()).toBe('咖啡')
-    expect(wrapper.find('.transaction-date').text()).toBe('2026-06-12')
+    expect(wrapper.findAll('.transaction-name').map((name) => name.text())).toContain('咖啡')
+    expect(wrapper.findAll('.day-group header strong').map((date) => date.text())).toEqual(['2026-06-14', '2026-06-12'])
+    expect(wrapper.find('.pie-chart').exists()).toBe(true)
+    expect(wrapper.findAll('.chart-legend li')).toHaveLength(2)
     expect(listTransactions).toHaveBeenCalledWith(
       'ledger-1',
       1,

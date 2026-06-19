@@ -53,6 +53,8 @@ function ledger(overrides: Partial<Ledger> = {}): Ledger {
 }
 
 describe('WizardFlow', () => {
+  const originalVibrate = navigator.vibrate
+
   beforeEach(() => {
     vi.clearAllMocks()
     preferredItems.splice(0, preferredItems.length, 'item.rice', 'item.eggs')
@@ -60,6 +62,11 @@ describe('WizardFlow', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+    if (originalVibrate) {
+      Object.defineProperty(navigator, 'vibrate', { value: originalVibrate, configurable: true })
+    } else {
+      Reflect.deleteProperty(navigator, 'vibrate')
+    }
   })
 
   it('builds full item-mode step order from ledger settings', () => {
@@ -121,6 +128,19 @@ describe('WizardFlow', () => {
     ])
   })
 
+  it('requests haptic feedback when tapping the amount keypad', async () => {
+    const vibrate = vi.fn()
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true })
+    const wrapper = mount(WizardFlow, {
+      props: { ledger: ledger() },
+    })
+    await vi.waitFor(() => expect(wrapper.find('.keypad').exists()).toBe(true))
+
+    await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
+
+    expect(vibrate).toHaveBeenCalledWith(8)
+  })
+
   it('lets the amount step choose yesterday and saves that transaction date', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 5, 17, 9, 0, 0))
@@ -155,6 +175,43 @@ describe('WizardFlow', () => {
         currency_code: 'JPY',
       },
     ])
+
+    await vi.waitFor(() => expect(wrapper.find('.done-panel').exists()).toBe(true))
+    await wrapper.find('.done-panel .primary-button').trigger('click')
+    await vi.waitFor(() => expect(wrapper.find('.keypad').exists()).toBe(true))
+    expect(wrapper.text()).toContain('2026/6/16(昨天)')
+  })
+
+  it('shows a saving overlay while the final submit is in progress', async () => {
+    let resolveSave: () => void = () => undefined
+    vi.mocked(createTransaction).mockImplementationOnce(
+      async () =>
+        new Promise((resolve) => {
+          resolveSave = () => resolve({ id: 'transaction-1' } as Awaited<ReturnType<typeof createTransaction>>)
+        }),
+    )
+    const wrapper = mount(WizardFlow, {
+      props: {
+        ledger: ledger({
+          entry_mode: 'receipt',
+          subject_enabled: false,
+          subject_step_mode: 'disabled',
+          necessity_step_mode: 'disabled',
+        }),
+      },
+    })
+    await vi.waitFor(() => expect(wrapper.find('.keypad').exists()).toBe(true))
+
+    await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
+    await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('分类'))
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
+
+    await vi.waitFor(() => expect(wrapper.find('.saving-overlay').exists()).toBe(true))
+    expect(wrapper.text()).toContain('保存中')
+
+    resolveSave()
+    await vi.waitFor(() => expect(wrapper.find('.done-panel').exists()).toBe(true))
   })
 
   it('opens a large app calendar and applies the selected date immediately', async () => {
@@ -222,6 +279,7 @@ describe('WizardFlow', () => {
     await wrapper.findAll('.keypad button').find((button) => button.text() === '2')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === '0')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === '0')?.trigger('click')
+    expect(wrapper.find('.amount-display strong').text()).toBe('1,200')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
 
     expect(wrapper.text()).toContain('分类')
