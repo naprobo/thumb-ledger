@@ -36,7 +36,7 @@
       <form v-if="isFormOpen" class="recurring-form" @submit.prevent="submitRecurring">
         <div class="grid-two">
           <label>
-            <span>{{ t('transaction.amount') }} ({{ ledger?.default_currency_code || 'JPY' }})</span>
+            <span>{{ t('transaction.amount') }} ({{ getCurrencySymbol(ledger?.default_currency_code || 'JPY') }})</span>
             <input v-model.number="draft.amount" inputmode="numeric" min="1" type="number" required />
           </label>
           <label>
@@ -139,6 +139,7 @@ import {
 import type { Necessity } from '@/api/transactions'
 import { translateLabel } from '@/i18n/labels'
 import { useLedgerStore } from '@/stores/ledgers'
+import { formatMoney, getCurrencySymbol } from '@/utils/money'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -276,7 +277,7 @@ function intervalLabel(interval: RecurringInterval): string {
 }
 
 function formatAmount(amount: number, currencyCode: string): string {
-  return `${amount.toLocaleString()} ${currencyCode}`
+  return formatMoney(amount, currencyCode)
 }
 
 function formatDate(value: Date): string {
@@ -297,9 +298,9 @@ function showToast(message: string, kind: 'success' | 'error') {
 
 <style scoped>
 .page-shell {
-  max-width: 900px;
+  width: min(100%, 1280px);
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px clamp(12px, 3vw, 36px);
 }
 
 .topbar,

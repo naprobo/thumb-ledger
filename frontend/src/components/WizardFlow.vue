@@ -499,25 +499,28 @@ button:disabled {
 
 :deep(.chip-grid) {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));
+  gap: 12px;
 }
 
-:deep(.chip-grid button) {
-  min-height: 104px;
+:deep(.choice-button) {
+  min-height: 96px;
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 1.05rem;
   font-weight: 800;
   line-height: 1.25;
   white-space: normal;
+  text-transform: none;
 }
 
-:deep(.selected) {
-  border-color: #2563eb;
-  background: #dbeafe;
+:deep(.choice-button .v-btn__content) {
+  min-width: 0;
+  white-space: normal;
+}
+
+:deep(.selected.choice-button) {
   color: #1d4ed8;
-  font-weight: 700;
 }
 
 :deep(.ghost-button) {
@@ -571,7 +574,13 @@ button:disabled {
 
 @media (max-width: 420px) {
   :deep(.chip-grid) {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  :deep(.choice-button) {
+    min-height: 88px;
+    font-size: 0.98rem;
   }
 }
 </style>

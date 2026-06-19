@@ -2,58 +2,81 @@
   <section class="wizard-step">
     <h2>{{ t('transaction.subject') }}</h2>
     <div v-if="frequentSubjects.length" class="chip-grid">
-      <button
+      <v-btn
         v-for="subject in frequentSubjects"
         :key="subject.id"
-        type="button"
-        class="subject-chip"
+        class="choice-button subject-chip"
         :class="{ selected: modelValue.includes(subject.id) }"
+        :color="modelValue.includes(subject.id) ? 'primary' : undefined"
+        :variant="modelValue.includes(subject.id) ? 'tonal' : 'outlined'"
+        size="large"
+        rounded="lg"
+        block
         @click="deleteMode ? $emit('remove', subject) : $emit('toggle', subject)"
       >
         {{ translateLabel(subject.name, t) }}
         <span v-if="deleteMode" class="delete-overlay" aria-hidden="true">
           <Trash2 :size="24" />
         </span>
-      </button>
+      </v-btn>
     </div>
-    <button type="button" class="primary-button subject-confirm" :disabled="!optional && modelValue.length === 0" @click="$emit('confirm')">
+    <v-btn class="primary-button subject-confirm" color="success" size="large" rounded="lg" :disabled="!optional && modelValue.length === 0" @click="$emit('confirm')">
       OK
-    </button>
+    </v-btn>
     <div class="chip-grid">
-      <button
+      <v-btn
         v-for="subject in secondarySubjects"
         :key="subject.id"
-        type="button"
-        class="subject-chip"
+        class="choice-button subject-chip"
         :class="{ selected: modelValue.includes(subject.id) }"
+        :color="modelValue.includes(subject.id) ? 'primary' : undefined"
+        :variant="modelValue.includes(subject.id) ? 'tonal' : 'outlined'"
+        size="large"
+        rounded="lg"
+        block
         @click="deleteMode ? $emit('remove', subject) : $emit('toggle', subject)"
       >
         {{ translateLabel(subject.name, t) }}
         <span v-if="deleteMode" class="delete-overlay" aria-hidden="true">
           <Trash2 :size="24" />
         </span>
-      </button>
-      <button v-if="!deleteMode" type="button" class="add-chip" :disabled="customLimitReached" :class="{ selected: isCustomOpen }" @click="openCustom">
+      </v-btn>
+      <v-btn
+        v-if="!deleteMode"
+        class="choice-button add-chip"
+        :disabled="customLimitReached"
+        :class="{ selected: isCustomOpen }"
+        :color="isCustomOpen ? 'primary' : undefined"
+        :variant="isCustomOpen ? 'tonal' : 'outlined'"
+        size="large"
+        rounded="lg"
+        block
+        @click="openCustom"
+      >
         <Plus :size="20" aria-hidden="true" />
         <span>{{ t('transaction.customSubject') }}</span>
-      </button>
+      </v-btn>
     </div>
-    <label v-if="isCustomOpen && !deleteMode" class="custom-subject-field">
-      <span>{{ t('transaction.subject') }}</span>
-      <input
+    <div v-if="isCustomOpen && !deleteMode" class="custom-subject-field">
+      <v-text-field
         ref="customInput"
         v-model.trim="customValue"
+        class="custom-input"
+        :label="t('transaction.subject')"
         maxlength="50"
         :placeholder="t('transaction.customSubjectPlaceholder')"
+        variant="outlined"
+        density="comfortable"
+        hide-details
         @keyup.enter="confirmCustom"
       />
-      <button type="button" class="primary-button" :disabled="!customValue || customLimitReached" @click="confirmCustom">
+      <v-btn class="primary-button" color="success" size="large" rounded="lg" :disabled="!customValue || customLimitReached" @click="confirmCustom">
         OK
-      </button>
-    </label>
-    <button v-if="optional" type="button" class="ghost-button" @click="$emit('skipForever')">
+      </v-btn>
+    </div>
+    <v-btn v-if="optional" class="ghost-button" variant="text" size="large" @click="$emit('skipForever')">
       {{ t('transaction.skipDontAsk') }}
-    </button>
+    </v-btn>
   </section>
 </template>
 
@@ -76,7 +99,7 @@ const emit = defineEmits<{ toggle: [subject: Subject]; confirm: []; create: [nam
 const { t } = useI18n()
 const isCustomOpen = ref(false)
 const customValue = ref('')
-const customInput = ref<HTMLInputElement | null>(null)
+const customInput = ref<{ focus: () => void } | null>(null)
 
 const frequentSubjects = computed(() => props.subjects.filter(isFrequentlyUsed))
 const secondarySubjects = computed(() => {
@@ -109,9 +132,10 @@ function confirmCustom() {
 
 <style scoped>
 .subject-confirm {
-  min-height: 72px;
+  min-height: 76px;
   font-size: 1.05rem;
   font-weight: 800;
+  text-transform: none;
 }
 
 .subject-chip {
@@ -129,22 +153,20 @@ function confirmCustom() {
 }
 
 .add-chip {
-  display: inline-grid;
-  grid-auto-flow: column;
-  place-content: center;
+  border-style: dashed;
+}
+
+.add-chip :deep(.v-btn__content) {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-style: dashed;
 }
 
 .custom-subject-field {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 88px;
-  gap: 8px;
-}
-
-.custom-subject-field span {
-  grid-column: 1 / -1;
+  align-items: center;
+  gap: 10px;
 }
 
 .custom-subject-field .primary-button {

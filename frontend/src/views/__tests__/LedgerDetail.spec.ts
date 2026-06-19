@@ -128,6 +128,10 @@ function makeRouter() {
   })
 }
 
+function mountLedgerDetail(router: ReturnType<typeof makeRouter>) {
+  return mount(LedgerDetail, { global: { plugins: [router] } })
+}
+
 describe('LedgerDetail', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -142,7 +146,7 @@ describe('LedgerDetail', () => {
     router.push('/ledgers/ledger-1')
     await router.isReady()
 
-    const wrapper = mount(LedgerDetail, { global: { plugins: [router] } })
+    const wrapper = mountLedgerDetail(router)
     await vi.waitFor(() => expect(wrapper.text()).toContain('Home'))
 
     expect(wrapper.find('.topbar .record-button').exists()).toBe(true)
@@ -154,9 +158,9 @@ describe('LedgerDetail', () => {
     expect(wrapper.text()).not.toContain('transaction.monthTotal')
     expect(wrapper.text()).toContain('咖啡')
     expect(wrapper.text()).toContain('Lunch')
-    expect(wrapper.text()).toContain('1,200 JPY')
-    expect(wrapper.text()).toContain('2,600 JPY')
-    expect(wrapper.text()).toContain('当天合计 1,400 JPY')
+    expect(wrapper.text()).toContain('¥1,200')
+    expect(wrapper.text()).toContain('¥2,600')
+    expect(wrapper.text()).toContain('当天合计 ¥1,400')
     expect(wrapper.text()).not.toContain('1 / 1')
     expect(wrapper.findAll('.month-nav button')).toHaveLength(2)
     expect(wrapper.find('.transaction-list li').classes()).not.toContain('transaction-meta')
@@ -178,7 +182,7 @@ describe('LedgerDetail', () => {
     router.push('/ledgers/ledger-1')
     await router.isReady()
 
-    const wrapper = mount(LedgerDetail, { global: { plugins: [router] } })
+    const wrapper = mountLedgerDetail(router)
     await vi.waitFor(() => expect(wrapper.text()).toContain('Home'))
     await wrapper.find('.topbar .record-button').trigger('click')
     await vi.waitFor(() => expect(wrapper.find('.keypad').exists()).toBe(true))
@@ -199,7 +203,7 @@ describe('LedgerDetail', () => {
     router.push('/ledgers/ledger-1')
     await router.isReady()
 
-    const wrapper = mount(LedgerDetail, { global: { plugins: [router] } })
+    const wrapper = mountLedgerDetail(router)
     await vi.waitFor(() => expect(wrapper.find('.budget-panel.over').exists()).toBe(true))
 
     expect(wrapper.find('.budget-panel.over').exists()).toBe(true)

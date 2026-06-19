@@ -65,7 +65,7 @@ describe('LedgerList', () => {
     const wrapper = mount(LedgerList, { global: { plugins: [router] } })
 
     expect(wrapper.text()).toContain('Home')
-    expect(wrapper.text()).toContain('JPY')
+    expect(wrapper.text()).toContain('¥')
     expect(wrapper.find('.settings-icon-button svg').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('设置')
   })

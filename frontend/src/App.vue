@@ -1,42 +1,44 @@
 <template>
-  <header v-if="authStore.isAuthenticated" class="app-header">
-    <button type="button" class="brand-button" @click="router.push({ name: 'ledger-list' })">
-      {{ t('app.title') }}
-    </button>
-    <details ref="menuRef" class="user-menu">
-      <summary :aria-label="menuLabel" :title="menuLabel">
-        <Menu :size="22" aria-hidden="true" />
-      </summary>
-      <div class="menu-panel">
-        <p>{{ authStore.user?.email }}</p>
-        <button type="button" @click="goTo('ledger-list')">
-          {{ t('nav.ledgers') }}
-        </button>
-        <button type="button" @click="goTo('suggestions')">
-          {{ t('nav.suggestions') }}
-        </button>
-        <label class="language-select">
-          <span>{{ t('settings.language') }}</span>
-          <select :value="locale" @change="changeLanguage">
-            <option v-for="option in localeOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </label>
-        <button
-          v-if="authStore.isAdmin"
-          type="button"
-          @click="goTo('admin')"
-        >
-          {{ t('nav.admin') }}
-        </button>
-        <button type="button" @click="logout">
-          {{ t('nav.logout') }}
-        </button>
-      </div>
-    </details>
-  </header>
-  <router-view />
+  <v-app>
+    <header v-if="authStore.isAuthenticated" class="app-header">
+      <button type="button" class="brand-button" @click="router.push({ name: 'ledger-list' })">
+        {{ t('app.title') }}
+      </button>
+      <details ref="menuRef" class="user-menu">
+        <summary :aria-label="menuLabel" :title="menuLabel">
+          <Menu :size="22" aria-hidden="true" />
+        </summary>
+        <div class="menu-panel">
+          <p>{{ authStore.user?.email }}</p>
+          <button type="button" @click="goTo('ledger-list')">
+            {{ t('nav.ledgers') }}
+          </button>
+          <button type="button" @click="goTo('suggestions')">
+            {{ t('nav.suggestions') }}
+          </button>
+          <label class="language-select">
+            <span>{{ t('settings.language') }}</span>
+            <select :value="locale" @change="changeLanguage">
+              <option v-for="option in localeOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+          <button
+            v-if="authStore.isAdmin"
+            type="button"
+            @click="goTo('admin')"
+          >
+            {{ t('nav.admin') }}
+          </button>
+          <button type="button" @click="logout">
+            {{ t('nav.logout') }}
+          </button>
+        </div>
+      </details>
+    </header>
+    <router-view />
+  </v-app>
 </template>
 
 <script setup lang="ts">
