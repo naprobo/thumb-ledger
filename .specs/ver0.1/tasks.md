@@ -156,14 +156,14 @@
 
   - [x] 5.11 实现自定义 Category 管理 API
     - 新增 `Category` ORM 模型和 Alembic 迁移；交易明细保存 `category_id` 与 `category_name_snapshot`
-    - `GET /ledgers/{id}/categories` 返回系统默认分类与自定义分类，按 display_order 排序
-    - `POST /ledgers/{id}/categories` 添加自定义分类；`PATCH` 重命名自定义分类；`DELETE` 删除自定义分类
+    - `GET /ledgers/{id}/categories` 返回系统固定分类，按 display_order 排序
+    - `POST /ledgers/{id}/categories`、`PATCH`、`DELETE` 保留为 Legacy/Internal 自定义分类 API，当前产品 UI 不暴露入口
     - 系统默认分类不可删除；分类名称需设置长度约束并参与 i18n 映射策略
     - _Requirements: 4.1, 4.4, 4.5, 14.6, 17.5_
 
 - [x] 6. 偏好引擎（Preference Engine）
   - [x] 6.1 实现默认 Category / Item Suggestion Catalog
-    - 定义默认 Category：食物、服装、日用品、交通、娱乐、医疗、其他
+    - 定义默认 Category：食品饮料、外食餐饮、日用品、服饰鞋包、居住、水电燃气、通信网络、交通出行、汽车用车、医疗健康、保险、教育学习、育儿子女、宠物、娱乐休闲、旅行住宿、数码家电、订阅会员、社交礼金、美容护理、税费手续费、其他
     - 每个 Category 至少预置 5 个常用 Item name suggestions
     - 默认 Category 初始化到账本分类表，默认顺序作为 Preference Engine 在 selection_count 相同情况下的 tie-breaker
     - 所有默认 Category / Item 名称需可被 i18n 翻译层映射
@@ -183,7 +183,7 @@
 - [x] 7. 交易核心流程（Transaction Service）
   - [x] 7.1 实现交易 CRUD API
     - 创建 `backend/app/routers/transactions.py`
-    - `POST /ledgers/{id}/transactions`：校验金额为正整数、currency_code ISO 4217、necessity 枚举；Entry_Mode=receipt 时无需 items；necessity_step_mode=disabled 时强制 necessity="essential"；保存后调用偏好引擎更新计数
+    - `POST /ledgers/{id}/transactions`：校验金额为正整数、currency_code ISO 4217、necessity 枚举；Entry_Mode=receipt 时无需 Item name，但需要保存所选 Category 到交易明细；necessity_step_mode=disabled 时强制 necessity="essential"；保存后调用偏好引擎更新计数
     - `GET /ledgers/{id}/transactions`（分页 50/页，按 transaction_date DESC）
     - `GET /ledgers/{id}/transactions/{txn_id}`、`PATCH /ledgers/{id}/transactions/{txn_id}`、`DELETE /ledgers/{id}/transactions/{txn_id}`（级联删除图片）
     - 只读共享用户执行写操作返回 403
@@ -353,15 +353,16 @@
 
 - [x] 19. 前端：Wizard Flow（记账向导）
   - [x] 19.1 实现 WizardFlow 状态机容器
-    - 创建 `src/components/WizardFlow.vue`：维护步骤顺序数组（Amount → Category → Item → Necessity → Subject），根据账本配置动态启/禁步骤
+    - 创建 `src/components/WizardFlow.vue`：维护步骤顺序数组；receipt 模式为 Amount → Category → Necessity → Subject，item 模式为 Amount → Category → Item → Necessity → Subject，根据账本配置动态启/禁步骤
     - 步骤完成后自动跳转下一步（无需点击 Next），支持返回上一步
-    - Entry_Mode=item 时循环 Category→Item→Necessity 步骤
+    - 步骤切换和完成页显示时重置滚动位置到顶部
+    - Entry_Mode=item 时进入 Category→Item→Necessity 步骤；Entry_Mode=receipt 时选择 Category 后跳过 Item
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.6_
 
   - [x] 19.2 实现各 Wizard 步骤组件
     - `WizardStepAmount.vue`：应用内自制数字键盘，顶部计算器式金额显示，OK 后进入下一步（默认 Ledger 默认货币）
     - `WizardStepCategory.vue`：分类 chip 列表（偏好排序），tap 即选中
-    - `WizardStepItem.vue`：商品名称 chip 列表（偏好排序）+ `+ 自定义` chip 触发手动输入文本框
+    - `WizardStepItem.vue`：消费名称 chip 列表（偏好排序）+ `+ 自定义` chip 触发手动输入文本框；仅在 Entry_Mode=item 时出现
     - `WizardStepNecessity.vue`：刚需/非刚需两选项，不默认选择、不超时自动保存，提供与普通选项同等级的大块"关闭此步骤"按钮
     - `WizardStepSubject.vue`：Subject chip 列表（偏好排序），Subject_Step_Mode=optional 时提供"以后不再问"选项
     - _Requirements: 5.1, 5.7, 5.8, 5.10, 5.11, 5.12, 7.2, 7.3, 8.1, 8.2, 11.1, 11.2, 11.4, 11.5, 21.2, 21.3_

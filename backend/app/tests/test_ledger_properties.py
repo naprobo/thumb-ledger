@@ -93,12 +93,26 @@ def test_default_subjects_and_categories_match_spec() -> None:
     ]
     assert DEFAULT_CATEGORIES == [
         "category.food",
-        "category.clothing",
+        "category.dining",
         "category.daily",
+        "category.clothing",
         "category.housing",
+        "category.utilities",
+        "category.communication",
         "category.transport",
-        "category.entertainment",
+        "category.vehicle",
         "category.medical",
+        "category.insurance",
+        "category.education",
+        "category.childcare",
+        "category.pets",
+        "category.entertainment",
+        "category.travel",
+        "category.digital",
+        "category.subscriptions",
+        "category.social",
+        "category.beauty",
+        "category.taxes",
         "category.other",
     ]
 

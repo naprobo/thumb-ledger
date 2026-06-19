@@ -1,5 +1,5 @@
 <template>
-  <section class="wizard-shell">
+  <section ref="wizardShell" class="wizard-shell">
     <header class="wizard-titlebar">
       <button
         v-if="!showDone"
@@ -83,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronLeft, Trash2, X } from '@lucide/vue'
 
@@ -109,6 +109,7 @@ const isSaving = ref(false)
 const showDone = ref(false)
 const errorMessage = ref('')
 const subjectDeleteMode = ref(false)
+const wizardShell = ref<HTMLElement | null>(null)
 const draft = reactive<WizardDraft>(defaultDraft())
 
 const steps = computed(() => buildWizardSteps(props.ledger))
@@ -148,11 +149,15 @@ watch(
 watch(
   () => draft.category,
   async (category) => {
-    if (category) {
+    if (category && props.ledger.entry_mode === 'item') {
       items.value = await getPreferredItems(props.ledger.id, category)
     }
   },
 )
+
+watch([currentIndex, showDone], async () => {
+  await resetWizardScroll()
+})
 
 function defaultDraft(): WizardDraft {
   return {
@@ -170,9 +175,6 @@ function defaultDraft(): WizardDraft {
 
 async function loadPreferences() {
   categories.value = await getPreferredCategories(props.ledger.id)
-  if (props.ledger.entry_mode === 'receipt') {
-    items.value = await getPreferredItems(props.ledger.id, 'category.other')
-  }
   const preferredSubjects = await getSubjectPreferenceDetails(props.ledger.id)
   const subjectRows = await listSubjects(props.ledger.id)
   subjects.value = preferredSubjects
@@ -194,9 +196,13 @@ function handleAmount(value: { amount: number | null; currencyCode: string }) {
   if (draft.amount) next()
 }
 
-function selectCategory(category: string) {
+async function selectCategory(category: string) {
   draft.category = category
-  next()
+  if (props.ledger.entry_mode === 'item') {
+    next()
+    return
+  }
+  await advanceOrSave()
 }
 
 async function selectItem(item: string) {
@@ -279,23 +285,23 @@ async function save() {
   isSaving.value = true
   errorMessage.value = ''
   try {
+    const items = draft.category
+      ? [
+          {
+            category_name: draft.category,
+            item_name: props.ledger.entry_mode === 'item' ? draft.itemName : undefined,
+            amount: draft.amount,
+            currency_code: draft.currencyCode,
+          },
+        ]
+      : []
     const payload = {
       amount: draft.amount,
       currency_code: draft.currencyCode,
       transaction_date: draft.transactionDate,
       necessity: props.ledger.necessity_step_mode !== 'disabled' ? draft.necessity || 'essential' : 'essential',
       note: draft.note || undefined,
-      items:
-        props.ledger.entry_mode === 'item' || draft.itemName
-          ? [
-              {
-                category_name: draft.category || 'category.other',
-                item_name: draft.itemName,
-                amount: draft.amount,
-                currency_code: draft.currencyCode,
-              },
-            ]
-          : [],
+      items,
       subject_ids: draft.subjectIds,
     }
     await createTransaction(props.ledger.id, payload)
@@ -325,6 +331,29 @@ function formatDate(value: Date): string {
   const month = String(value.getMonth() + 1).padStart(2, '0')
   const day = String(value.getDate()).padStart(2, '0')
   return `${value.getFullYear()}-${month}-${day}`
+}
+
+async function resetWizardScroll() {
+  await nextTick()
+  const scrollTargets: Array<HTMLElement | Element | null | undefined> = [
+    wizardShell.value,
+    wizardShell.value?.parentElement,
+    document.scrollingElement,
+  ]
+  for (const target of scrollTargets) {
+    if (!target) continue
+    if ('scrollTo' in target && typeof target.scrollTo === 'function') {
+      target.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    } else {
+      target.scrollTop = 0
+    }
+  }
+  if (navigator.userAgent.includes('jsdom')) return
+  try {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  } catch {
+    // Some test environments expose scrollTo without implementing it.
+  }
 }
 </script>
 

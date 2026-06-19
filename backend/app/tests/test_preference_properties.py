@@ -35,16 +35,39 @@ def test_property_10_preference_sort_counts_and_default_tie_breaker(
 def test_default_category_catalog_matches_spec_and_has_item_suggestions() -> None:
     assert DEFAULT_CATEGORIES == [
         "category.food",
-        "category.clothing",
+        "category.dining",
         "category.daily",
+        "category.clothing",
         "category.housing",
+        "category.utilities",
+        "category.communication",
         "category.transport",
-        "category.entertainment",
+        "category.vehicle",
         "category.medical",
+        "category.insurance",
+        "category.education",
+        "category.childcare",
+        "category.pets",
+        "category.entertainment",
+        "category.travel",
+        "category.digital",
+        "category.subscriptions",
+        "category.social",
+        "category.beauty",
+        "category.taxes",
         "category.other",
     ]
     for category in DEFAULT_CATEGORIES:
         assert len(DEFAULT_ITEM_SUGGESTIONS[category]) >= 5
+
+
+def test_selected_categories_sort_by_count_then_default_order() -> None:
+    default_order = ["category.food", "category.dining", "category.pets", "category.other"]
+    counts = {"category.food": 1, "category.pets": 1, "category.dining": 0, "category.other": 0}
+
+    result = sort_tags_by_preference(default_order, counts)
+
+    assert result == ["category.food", "category.pets", "category.dining", "category.other"]
 
 
 def test_custom_items_are_sorted_after_defaults_when_unselected() -> None:

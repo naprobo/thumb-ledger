@@ -107,10 +107,10 @@ sequenceDiagram
 - `GET /ledgers/{id}` — 账本详情
 - `PATCH /ledgers/{id}` — 更新账本配置（名称、Subject_Step_Mode、Necessity_Step_Mode）
 - `DELETE /ledgers/{id}` — 删除账本（级联删除所有交易）
-- `GET /ledgers/{id}/categories` — 获取默认与自定义分类
-- `POST /ledgers/{id}/categories` — 添加自定义分类
-- `PATCH /ledgers/{id}/categories/{category_id}` — 重命名自定义分类
-- `DELETE /ledgers/{id}/categories/{category_id}` — 删除自定义分类（系统默认分类不可删）
+- `GET /ledgers/{id}/categories` — 获取系统固定分类
+- `POST /ledgers/{id}/categories` — Legacy/Internal：添加自定义分类（当前产品不暴露入口）
+- `PATCH /ledgers/{id}/categories/{category_id}` — Legacy/Internal：重命名自定义分类（当前产品不暴露入口）
+- `DELETE /ledgers/{id}/categories/{category_id}` — Legacy/Internal：删除自定义分类（当前产品不暴露入口，系统默认分类不可删）
 - `GET /ledgers/{id}/share-code` — 获取分享码
 - `POST /ledgers/{id}/share-requests` — 提交加入申请
 - `GET /ledgers/{id}/share-requests` — Owner 查看待审申请
@@ -200,8 +200,10 @@ sequenceDiagram
 
 Wizard Flow 前端交互约束：
 - `WizardStepAmount.vue` 使用应用内自制数字键盘作为金额主输入方式，不渲染原生金额输入框，不依赖浏览器/系统输入法；上方以计算器式显示区展示当前金额和默认货币，OK 键确认后进入下一步。
-- `WizardStepItem.vue` 默认展示偏好排序后的商品名标签；自定义商品名通过 `+ 自定义` 标签入口打开文本输入框，避免一进入商品名步骤就弹出系统键盘。
+- `WizardStepCategory.vue` 默认展示偏好排序后的分类标签。receipt（一张小票一笔）模式在 Amount 后直接进入 Category，选择后跳过 Item name，并将整张小票金额保存到该分类下。
+- `WizardStepItem.vue` 仅在 item（逐商品）模式出现，默认展示偏好排序后的消费名称标签；自定义消费名称通过 `+ 自定义` 标签入口打开文本输入框，避免一进入消费名称步骤就弹出系统键盘。
 - `WizardFlow.vue` 统一渲染顶部标题栏：Amount 标题为"输入金额"，Amount 左侧返回回到账本主页，后续步骤左侧返回到上一步；完成页标题为"记录成功"且不提供返回动作。
+- `WizardFlow.vue` 在步骤切换和进入完成页时应将当前 Wizard/页面滚动位置重置到顶部，避免上一屏滚动位置影响下一屏。
 - `WizardStepNecessity.vue` 不做默认预选或超时自动保存；"刚需"、"非刚需"、"关闭此步骤"均使用同等级的大块按钮。
 - `LedgerDetail.vue`、Wizard 各步骤及消费记录列表静态文案均必须通过 `vue-i18n` 消息键渲染，测试需防止 `transaction.list`、`transaction.monthTotal` 等裸 key 暴露到 UI。
 - `LedgerDetail.vue` 以月份为单位查询并展示消费记录，本月合计来自当前月日期范围；底部使用上一月/下一月按钮，不显示页码。
@@ -440,7 +442,9 @@ erDiagram
 
 **PREFERENCE 表**：`tag_type` = `subject` | `category` | `item`；`category` 字段在 `tag_type=item` 时非空。
 
-**CATEGORY 表**：每个账本包含系统默认分类和 Owner 添加的自定义分类；`is_system=True` 的默认分类不可删除，`display_order` 用于默认排序和偏好排序 tie-breaker。
+**CATEGORY 表**：每个账本包含系统固定分类；`is_system=True` 的默认分类不可删除，`display_order` 用于默认排序和偏好排序 tie-breaker。当前产品不在 UI 中暴露自定义分类入口。
+
+系统默认分类当前为：`category.food`（食品饮料）、`category.dining`（外食餐饮）、`category.daily`（日用品）、`category.clothing`（服饰鞋包）、`category.housing`（居住）、`category.utilities`（水电燃气）、`category.communication`（通信网络）、`category.transport`（交通出行）、`category.vehicle`（汽车用车）、`category.medical`（医疗健康）、`category.insurance`（保险）、`category.education`（教育学习）、`category.childcare`（育儿子女）、`category.pets`（宠物）、`category.entertainment`（娱乐休闲）、`category.travel`（旅行住宿）、`category.digital`（数码家电）、`category.subscriptions`（订阅会员）、`category.social`（社交礼金）、`category.beauty`（美容护理）、`category.taxes`（税费手续费）、`category.other`（其他）。Category 是预算和统计维度的消费大类；具体费用如油费、停车费、车检、保养等应作为 `category.vehicle` 下的 Item name，而不是默认直接新增为 Category。
 
 **TRANSACTION_ITEM.category_name_snapshot**：保存记账当时的分类名称快照，确保后续自定义分类重命名或删除不改变历史交易显示。
 

@@ -16,10 +16,8 @@ export interface WizardDraft {
 }
 
 export function buildWizardSteps(ledger: Ledger): WizardStepId[] {
-  const steps: WizardStepId[] = ['amount']
+  const steps: WizardStepId[] = ['amount', 'category']
   if (ledger.entry_mode === 'item') {
-    steps.push('category', 'item')
-  } else {
     steps.push('item')
   }
   if (ledger.necessity_step_mode !== 'disabled') {

@@ -19,8 +19,8 @@
 - **Subject_Step_Mode（花费对象步骤模式）**: 账本级别的配置，决定在 Wizard Flow 中花费对象步骤是"必须选择"还是"可跳过"；用户可在记账过程中关闭该步骤，也可在账本设置中随时重新开启
 - **Necessity（消费必要性）**: 每笔消费的属性标签，分为"刚需"（essential，如食物、日用品）和"非刚需"（non-essential，如小饰品、改善性消费）
 - **Necessity_Step_Mode（必要性步骤模式）**: 账本级别的配置，决定是否在 Wizard Flow 中显示"刚需/非刚需"选择步骤；默认关闭，开启后用户可在记账中途随时关闭
-- **Category（分类）**: 消费品类标签（如食物、服装、日用品）
-- **Item（消费名称）**: 属于某个 Category 下的具体消费名称（如"牛奶"、"T恤"）
+- **Category（分类 / 消费大类）**: 用于预算和统计的一级消费品类标签（如食物、服装、日用品、交通）。用户自定义 Category 时应表达相对稳定的大类，而不是一次性明细费用。
+- **Item（消费名称 / 明细）**: 属于某个 Category 下的具体消费名称（如"牛奶"、"T恤"、"油费"、"车检"）。
 - **Suggestion（建议）**: 用户提交给系统运营者的功能需求、问题反馈或改进意见，可选择公开以寻求其他用户支持或反对
 - **Suggestion_Vote（建议投票）**: 用户对公开 Suggestion 表达支持或反对的记录，每个用户对同一建议最多保留一个当前立场
 - **Notification（通知）**: 系统向用户提示待处理共享申请、审批结果等事件的机制；MVP 采用站内状态查询与可选邮件通知
@@ -117,16 +117,16 @@
 
 #### Acceptance Criteria
 
-1. THE Transaction_Service SHALL require the User to select a Category for each Transaction from the following pre-defined list: 食物、服装、日用品、交通、娱乐、医疗、其他.
+1. THE Transaction_Service SHALL require the User to select a Category for each Transaction from the following pre-defined list: 食品饮料、外食餐饮、日用品、服饰鞋包、居住、水电燃气、通信网络、交通出行、汽车用车、医疗健康、保险、教育学习、育儿子女、宠物、娱乐休闲、旅行住宿、数码家电、订阅会员、社交礼金、美容护理、税费手续费、其他.
 2. WHEN Entry_Mode is "item", after a Category is selected, THE Transaction_Service SHALL present a list of suggested Item names belonging to that Category for the User to tap-select.
 3. THE Transaction_Service SHALL pre-populate each Category with at least 5 common Item name suggestions.
-4. THE Ledger_Service SHALL allow the Owner to add custom Categories for a Ledger beyond the pre-defined list.
-5. THE Ledger_Service SHALL allow the Owner to rename or delete custom Categories, but SHALL NOT allow deletion of system pre-defined Categories.
+4. THE Product SHALL NOT expose custom Category creation in the normal user flow; Category is a fixed system-provided budget/statistics dimension.
+5. THE UI SHOULD explain that Category is a budget/statistics-level spending group and Item is the place for detailed costs such as 油费 or 车检.
 6. WHEN the User selects a suggested Item name, THE Transaction_Service SHALL record that name without requiring manual text input.
 7. WHERE the User requires an Item name not in the suggestion list, THE Transaction_Service SHALL present a tappable "+ 自定义" chip in the Item name tag list and reveal a text input field only after that chip is selected; the confirmation OK control SHALL appear immediately beside the text input.
-10. WHEN Entry_Mode is "receipt", THE Wizard_Flow SHALL present the Item name selection immediately after Amount, before Necessity, using recent/default Item suggestions without requiring Category selection first.
-8. WHEN a User selects a Category or Item name, THE Preference_Engine SHALL increment the selection count for that tag within its Ledger and Category scope.
-9. THE Preference_Engine SHALL return Category and Item name suggestions sorted by selection count descending, with ties broken by the original default order.
+8. WHEN Entry_Mode is "receipt", THE Wizard_Flow SHALL require Category selection after Amount and SHALL NOT require Item name selection; the selected Category SHALL be saved on the generated TransactionItem with an empty Item name.
+9. WHEN a User selects a Category or Item name, THE Preference_Engine SHALL increment the selection count for that tag within its Ledger and Category scope.
+10. THE Preference_Engine SHALL return Category and Item name suggestions sorted by selection count descending, with ties broken by the original default order.
 
 ---
 
@@ -137,11 +137,12 @@
 #### Acceptance Criteria
 
 1. WHEN a User starts recording a new Transaction, THE Wizard_Flow SHALL present the steps in the following order for item mode: 金额（Amount） → 分类（Category） → 消费名称（Item name） → 必要性（Necessity，仅在 Necessity_Step_Mode 启用时出现） → 花费对象（Subject，仅在 Subject tracking 启用时出现）.
-1a. WHEN Entry_Mode is "receipt", THE Wizard_Flow SHALL present the steps in the following order: 金额（Amount） → 消费名称（Item name） → 必要性（Necessity，仅在 Necessity_Step_Mode 启用时出现） → 花费对象（Subject，仅在 Subject tracking 启用时出现）.
+1a. WHEN Entry_Mode is "receipt", THE Wizard_Flow SHALL present the steps in the following order: 金额（Amount） → 分类（Category） → 必要性（Necessity，仅在 Necessity_Step_Mode 启用时出现） → 花费对象（Subject，仅在 Subject tracking 启用时出现）.
 2. WHEN the User completes input on one Wizard_Flow step, THE Wizard_Flow SHALL automatically advance to the next step without requiring a manual "next" tap.
 3. THE Wizard_Flow SHALL display only the content for the current step on screen, with no other steps visible simultaneously.
 4. THE Wizard_Flow SHALL display a consistent title bar on every step; the Amount step title SHALL be "输入金额".
 4a. THE Wizard_Flow SHALL allow the User to navigate back with a single tap from the title bar: on the Amount step this returns to the Ledger home, and on later steps this returns to the previous step.
+4b. WHEN THE Wizard_Flow advances to a new step or to the completion prompt, THE visible scroll position SHALL reset to the top of the Wizard screen.
 5. WHEN the User reaches the final step and confirms, THE Wizard_Flow SHALL save the Transaction and display a completion prompt.
 6. WHEN Entry_Mode is "item", THE Wizard_Flow SHALL repeat the Category → Item name → Necessity steps for each additional item the User chooses to add.
 7. WHEN Subject_Step_Mode is "optional", THE Wizard_Flow SHALL display a "以后不再问" (skip and don't ask again) option on the Subject selection step, operable with a single tap.
@@ -177,7 +178,7 @@
 #### Acceptance Criteria
 
 1. WHEN a User opens a Ledger, THE Transaction_Service SHALL present a compact plus icon action beside the Ledger name to start recording a new Transaction; Ledger settings SHALL be represented by a gear icon beside it with enough spacing to reduce accidental taps.
-2. WHEN Entry_Mode is "receipt", THE Transaction_Service SHALL require only a total amount and an optional note, with no mandatory item breakdown.
+2. WHEN Entry_Mode is "receipt", THE Transaction_Service SHALL require a total amount and Category, with optional note and no mandatory Item name breakdown.
 3. WHEN Entry_Mode is "item", THE Transaction_Service SHALL allow the User to add one or more items, each with an amount and a Category-guided name.
 4. THE Transaction_Service SHALL allow the User to record the transaction date, defaulting to the current date.
 5. THE Transaction_Service SHALL record a Currency_Code (ISO 4217) for each Transaction, defaulting to the Ledger's configured currency.
