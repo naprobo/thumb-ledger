@@ -83,21 +83,50 @@ npm run test
 
 ## 生产环境部署
 
-**1. 配置 Cloudflare Tunnel**
+**1. 在 Cloudflare Zero Trust 创建 Tunnel**
 
-在 `cloudflared/config.yml` 中填入你的 Tunnel ID 和域名，并将 credentials 文件放到 `cloudflared/` 目录。
+使用 Cloudflare 推荐的 token 方式。Tunnel 创建后，在 Public Hostname 中配置：
+
+```text
+Hostname: ledger.neuronspark.studio
+Service: http://nginx:80
+```
+
+这里的 `nginx` 是 Docker Compose 内部服务名，不是服务器的 `localhost`。
+
+如果服务器上曾经安装过 systemd 版 cloudflared，先清理旧服务：
+
+```bash
+sudo cloudflared service uninstall || true
+sudo systemctl disable --now cloudflared || true
+sudo systemctl daemon-reload
+```
+
+本项目由 Docker Compose 启动 `cloudflared` 容器，不需要执行 `sudo cloudflared service install <token>`。
 
 **2. 创建生产环境变量文件**
 
 ```bash
 cp .env.example .env.prod
-# 编辑 .env.prod，填入强密码和生产配置
+# 编辑 .env.prod，填入强密码、生产配置和 Cloudflare Tunnel token
 ```
+
+至少需要设置：
+
+```env
+APP_ENV=production
+SECRET_KEY=<openssl rand -hex 32 生成的密钥>
+ALLOWED_ORIGINS=https://ledger.neuronspark.studio
+TUNNEL_TOKEN=<Cloudflare 提供的完整 tunnel token>
+```
+
+不要提交 `.env.prod`，其中包含生产密钥。
 
 **3. 构建并启动**
 
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml logs -f cloudflared
 ```
 
 生产环境下 cloudflared 会自动建立 Tunnel，外部流量通过 Cloudflare → nginx → backend/frontend，数据库不对外暴露。
@@ -118,7 +147,6 @@ docker compose -f docker-compose.prod.yml up -d --build
 │   ├── Dockerfile
 │   └── package.json
 ├── nginx/            # 生产 nginx 配置
-├── cloudflared/      # Cloudflare Tunnel 配置
 ├── .devcontainer/    # VS Code Dev Container 配置
 ├── docker-compose.dev.yml
 ├── docker-compose.prod.yml
