@@ -87,7 +87,7 @@ const numericAmount = computed(() => {
   const parsed = parseMinorAmount(amountText.value, fractionDigits.value)
   return parsed && Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null
 })
-const displayAmount = computed(() => amountText.value || '0')
+const displayAmount = computed(() => formatDisplayAmount(amountText.value))
 const selectedDateLabel = computed(() => formatDisplayDate(props.transactionDate, true))
 const previousDateLabel = computed(() => formatDisplayDate(addDays(props.transactionDate, -1), false))
 const datepickerLocale = computed(() => {
@@ -127,6 +127,7 @@ function selectShortcutDate(value: string) {
 }
 
 function appendDigit(digit: string) {
+  triggerKeyFeedback()
   if (amountText.value === '0') {
     amountText.value = digit
     return
@@ -139,19 +140,27 @@ function appendDigit(digit: string) {
 }
 
 function appendDecimal() {
+  triggerKeyFeedback()
   if (fractionDigits.value === 0 || amountText.value.includes('.')) return
   amountText.value = amountText.value ? `${amountText.value}.` : '0.'
 }
 
 function clearAmount() {
+  triggerKeyFeedback()
   amountText.value = ''
 }
 
 function emitChange() {
+  triggerKeyFeedback()
   emit('change', {
     amount: numericAmount.value,
     currencyCode: localCurrency.value.toUpperCase(),
   })
+}
+
+function triggerKeyFeedback() {
+  if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return
+  navigator.vibrate(8)
 }
 
 function currencyFractionDigits(currencyCode: string): number {
@@ -178,6 +187,14 @@ function formatMinorAmount(value: number, scale: number): string {
   const whole = Math.floor(value / divisor)
   const fraction = String(value % divisor).padStart(scale, '0').replace(/0+$/, '')
   return fraction ? `${whole}.${fraction}` : String(whole)
+}
+
+function formatDisplayAmount(value: string): string {
+  if (!value) return '0'
+  const [whole, fraction] = value.split('.')
+  const groupedWhole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  if (value.endsWith('.')) return `${groupedWhole}.`
+  return fraction === undefined ? groupedWhole : `${groupedWhole}.${fraction}`
 }
 
 function formatDisplayDate(value: string, includeRelative: boolean): string {

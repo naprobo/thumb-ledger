@@ -67,25 +67,59 @@
           <span>{{ transactionList.total }}</span>
         </div>
 
-        <div v-if="Object.keys(transactionList.page_total_amounts).length" class="page-totals">
-          <strong>{{ t('transaction.monthTotal') }}</strong>
-          <span v-for="(amount, currency) in transactionList.page_total_amounts" :key="currency">
-            {{ formatAmount(amount, currency) }}
-          </span>
-        </div>
+        <details v-if="transactionList.items.length" class="month-records" open>
+          <summary>
+            <span>{{ currentMonthLabel }}</span>
+            <span class="month-total-label">{{ t('transaction.monthTotal') }}</span>
+            <strong v-for="(amount, currency) in transactionList.page_total_amounts" :key="currency">
+              {{ formatAmount(amount, currency) }}
+            </strong>
+          </summary>
 
-        <ul v-if="transactionList.items.length" class="transaction-list">
-          <li v-for="transaction in transactionList.items" :key="transaction.id">
-            <strong>{{ formatAmount(transaction.amount, transaction.currency_code) }}</strong>
-            <span class="transaction-name">{{ transactionLabel(transaction) }}</span>
-            <span class="transaction-date">{{ transaction.transaction_date }}</span>
-            <span v-if="ledger?.necessity_step_mode !== 'disabled'" class="transaction-necessity">
-              {{ necessityLabel(transaction.necessity) }}
-            </span>
-            <span v-if="transaction.note" class="transaction-note">{{ transaction.note }}</span>
-          </li>
-        </ul>
+          <section v-for="group in dailyTransactionGroups" :key="group.date" class="day-group">
+            <header>
+              <strong>{{ group.date }}</strong>
+              <span v-for="(amount, currency) in group.totals" :key="currency">
+                {{ t('transaction.dayTotal') }} {{ formatAmount(amount, currency) }}
+              </span>
+            </header>
+            <ul class="transaction-list">
+              <li v-for="transaction in group.transactions" :key="transaction.id">
+                <strong>{{ formatAmount(transaction.amount, transaction.currency_code) }}</strong>
+                <span class="transaction-name">{{ transactionLabel(transaction) }}</span>
+                <span v-if="ledger?.necessity_step_mode !== 'disabled'" class="transaction-necessity">
+                  {{ necessityLabel(transaction.necessity) }}
+                </span>
+                <span v-if="transaction.note" class="transaction-note">{{ transaction.note }}</span>
+              </li>
+            </ul>
+          </section>
+        </details>
         <p v-else class="muted">{{ t('transaction.noTransactions') }}</p>
+
+        <section v-if="categoryChartSlices.length" class="category-chart" :aria-label="t('transaction.categoryRatio')">
+          <h3>{{ t('transaction.categoryRatio') }}</h3>
+          <div class="chart-layout">
+            <svg class="pie-chart" viewBox="0 0 120 120" role="img" :aria-label="t('transaction.categoryRatio')">
+              <circle cx="60" cy="60" r="42" fill="#eef2f7" />
+              <path
+                v-for="slice in categoryChartSlices"
+                :key="slice.key"
+                :d="slice.path"
+                :fill="slice.color"
+              />
+              <circle cx="60" cy="60" r="22" fill="#fff" />
+            </svg>
+            <ul class="chart-legend">
+              <li v-for="slice in categoryChartSlices" :key="slice.key">
+                <span class="legend-color" :style="{ backgroundColor: slice.color }" />
+                <span>{{ slice.label }}</span>
+                <strong>{{ slice.percentage }}%</strong>
+                <small>{{ formatAmount(slice.amount, slice.currencyCode) }}</small>
+              </li>
+            </ul>
+          </div>
+        </section>
 
         <div class="month-nav">
           <button type="button" @click="changeMonth(-1)">
@@ -152,6 +186,55 @@ const budgetWarningClass = computed(() => ({
   soft: budget.value?.progress.warning === 'soft',
   over: budget.value?.progress.warning === 'over',
 }))
+const dailyTransactionGroups = computed(() => {
+  const groups = new Map<string, { date: string; transactions: Transaction[]; totals: Record<string, number> }>()
+  for (const transaction of transactionList.value.items) {
+    const group = groups.get(transaction.transaction_date) || {
+      date: transaction.transaction_date,
+      transactions: [],
+      totals: {},
+    }
+    group.transactions.push(transaction)
+    group.totals[transaction.currency_code] = (group.totals[transaction.currency_code] || 0) + transaction.amount
+    groups.set(transaction.transaction_date, group)
+  }
+  return [...groups.values()].sort((a, b) => b.date.localeCompare(a.date))
+})
+const categoryChartSlices = computed(() => {
+  const totals = new Map<string, { label: string; amount: number; currencyCode: string }>()
+  for (const transaction of transactionList.value.items) {
+    const item = transaction.items[0]
+    const category = item?.category_name_snapshot || 'category.other'
+    const currencyCode = item?.currency_code || transaction.currency_code
+    const key = `${category}:${currencyCode}`
+    const total = totals.get(key) || {
+      label: translateLabel(category, t),
+      amount: 0,
+      currencyCode,
+    }
+    total.amount += item?.amount || transaction.amount
+    totals.set(key, total)
+  }
+  const rows = [...totals.values()].filter((row) => row.amount > 0).sort((a, b) => b.amount - a.amount)
+  const grandTotal = rows.reduce((sum, row) => sum + row.amount, 0)
+  let startAngle = -90
+  return rows.map((row, index) => {
+    const angle = grandTotal > 0 ? Math.min(359.99, (row.amount / grandTotal) * 360) : 0
+    const endAngle = startAngle + angle
+    const slice = {
+      key: `${row.label}:${row.currencyCode}`,
+      label: row.label,
+      amount: row.amount,
+      currencyCode: row.currencyCode,
+      percentage: Math.round((row.amount / grandTotal) * 100),
+      color: chartColors[index % chartColors.length],
+      path: describeArc(60, 60, 42, startAngle, endAngle),
+    }
+    startAngle = endAngle
+    return slice
+  })
+})
+const chartColors = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#64748b']
 
 onMounted(async () => {
   await ledgerStore.fetchLedger(ledgerId.value)
@@ -230,6 +313,26 @@ function formatMonthHeading(value: Date): string {
 function formatMonthButton(value: Date): string {
   return `${value.getMonth() + 1}月`
 }
+
+function describeArc(cx: number, cy: number, radius: number, startAngle: number, endAngle: number): string {
+  const start = polarToCartesian(cx, cy, radius, endAngle)
+  const end = polarToCartesian(cx, cy, radius, startAngle)
+  const largeArcFlag = endAngle - startAngle <= 180 ? 0 : 1
+  return [
+    `M ${cx} ${cy}`,
+    `L ${start.x} ${start.y}`,
+    `A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`,
+    'Z',
+  ].join(' ')
+}
+
+function polarToCartesian(cx: number, cy: number, radius: number, angle: number): { x: number; y: number } {
+  const radians = (angle * Math.PI) / 180
+  return {
+    x: cx + radius * Math.cos(radians),
+    y: cy + radius * Math.sin(radians),
+  }
+}
 </script>
 
 <style scoped>
@@ -248,7 +351,6 @@ function formatMonthButton(value: Date): string {
 .topbar,
 .top-actions,
 .section-heading,
-.page-totals,
 .month-nav {
   display: flex;
   align-items: center;
@@ -385,16 +487,64 @@ button:disabled {
   background: #dc2626;
 }
 
+.month-records {
+  margin-top: 12px;
+}
+
+.month-records summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  padding: 0 14px;
+  background: #f8fafc;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.month-records summary strong {
+  margin-left: 0;
+}
+
+.month-total-label {
+  margin-left: auto;
+  color: #607086;
+  font-size: 0.92rem;
+}
+
+.day-group {
+  margin-top: 14px;
+}
+
+.day-group header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 0 0 8px;
+}
+
+.day-group header span {
+  color: #607086;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .transaction-list {
   display: grid;
   gap: 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .transaction-list li {
   display: grid;
-  grid-template-columns: minmax(88px, auto) minmax(0, 1fr) auto auto minmax(0, 1fr);
+  grid-template-columns: minmax(88px, auto) minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
   min-height: 40px;
@@ -404,7 +554,6 @@ button:disabled {
 
 .transaction-list strong,
 .transaction-name,
-.transaction-date,
 .transaction-necessity,
 .transaction-note {
   min-width: 0;
@@ -417,20 +566,74 @@ button:disabled {
   font-weight: 700;
 }
 
-.transaction-date,
 .transaction-necessity,
 .transaction-note,
 .muted {
   color: #607086;
 }
 
-.transaction-date,
 .transaction-necessity {
   font-size: 0.9rem;
 }
 
 .transaction-note {
   font-size: 0.9rem;
+}
+
+.category-chart {
+  margin-top: 18px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+}
+
+.category-chart h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.chart-layout {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.pie-chart {
+  width: 160px;
+  max-width: 100%;
+  height: auto;
+}
+
+.chart-legend {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chart-legend li {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.chart-legend span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-legend small {
+  color: #607086;
 }
 
 .month-nav {
@@ -448,7 +651,6 @@ button:disabled {
 @media (max-width: 640px) {
   .topbar,
   .top-actions,
-  .page-totals,
   .month-nav {
     align-items: center;
   }
@@ -458,18 +660,21 @@ button:disabled {
   }
 
   .transaction-list li {
-    grid-template-columns: minmax(76px, auto) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
   }
 
   .transaction-necessity,
   .transaction-note {
     display: none;
   }
-}
 
-@media (max-width: 420px) {
-  .transaction-date {
-    max-width: 5.5em;
+  .chart-layout {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .chart-legend {
+    width: 100%;
   }
 }
 </style>

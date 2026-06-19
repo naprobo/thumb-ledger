@@ -1,5 +1,5 @@
 <template>
-  <section ref="wizardShell" class="wizard-shell">
+  <section ref="wizardShell" class="wizard-shell" :class="{ saving: isSaving }">
     <header class="wizard-titlebar">
       <button
         v-if="!showDone"
@@ -34,7 +34,7 @@
         :currency-code="draft.currencyCode"
         :transaction-date="draft.transactionDate"
         @change="handleAmount"
-        @date-change="draft.transactionDate = $event"
+        @date-change="handleDateChange"
       />
       <WizardStepCategory
         v-else-if="currentStep === 'category'"
@@ -69,7 +69,10 @@
         @skip-forever="disableSubjectStep"
       />
 
-      <p v-if="isSaving" class="status">{{ t('app.loading') }}</p>
+      <div v-if="isSaving" class="saving-overlay" role="status" aria-live="polite">
+        <span class="spinner" aria-hidden="true" />
+        <strong>{{ t('transaction.saving') }}</strong>
+      </div>
     </template>
 
     <div v-else class="done-panel">
@@ -110,6 +113,8 @@ const showDone = ref(false)
 const errorMessage = ref('')
 const subjectDeleteMode = ref(false)
 const wizardShell = ref<HTMLElement | null>(null)
+const initialTransactionDate = formatDate(new Date())
+const lastTransactionDate = ref(initialTransactionDate)
 const draft = reactive<WizardDraft>(defaultDraft())
 
 const steps = computed(() => buildWizardSteps(props.ledger))
@@ -141,6 +146,7 @@ onMounted(async () => {
 watch(
   () => props.ledger.id,
   async () => {
+    lastTransactionDate.value = formatDate(new Date())
     reset()
     await loadPreferences()
   },
@@ -163,7 +169,7 @@ function defaultDraft(): WizardDraft {
   return {
     amount: null,
     currencyCode: props.ledger.default_currency_code,
-    transactionDate: formatDate(new Date()),
+    transactionDate: lastTransactionDate.value,
     category: '',
     itemName: '',
     necessity: null,
@@ -194,6 +200,11 @@ function handleAmount(value: { amount: number | null; currencyCode: string }) {
   draft.amount = value.amount
   draft.currencyCode = value.currencyCode
   if (draft.amount) next()
+}
+
+function handleDateChange(value: string) {
+  draft.transactionDate = value
+  lastTransactionDate.value = value
 }
 
 async function selectCategory(category: string) {
@@ -359,12 +370,19 @@ async function resetWizardScroll() {
 
 <style scoped>
 .wizard-shell {
+  position: relative;
   display: grid;
   gap: 16px;
   min-height: 100dvh;
   align-content: start;
   padding: 16px 0;
   background: #fff;
+}
+
+.wizard-shell.saving :deep(.wizard-step),
+.wizard-shell.saving .wizard-titlebar {
+  pointer-events: none;
+  opacity: 0.45;
 }
 
 .wizard-titlebar,
@@ -512,6 +530,37 @@ button:disabled {
 
 .status {
   color: #607086;
+}
+
+.saving-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+  background: rgb(255 255 255 / 72%);
+  color: #0f172a;
+}
+
+.saving-overlay strong {
+  font-size: 1rem;
+}
+
+.spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #dbeafe;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+  animation: spin 0.85s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 640px) {
