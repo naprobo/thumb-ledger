@@ -176,9 +176,9 @@ function formatDate(value: string): string {
 
 <style scoped>
 .page-shell {
-  max-width: 1080px;
+  width: min(100%, 1280px);
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px clamp(12px, 3vw, 36px);
 }
 
 .topbar,

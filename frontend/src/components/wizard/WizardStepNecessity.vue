@@ -2,15 +2,42 @@
   <section class="wizard-step">
     <h2>{{ t('transaction.necessity') }}</h2>
     <div class="chip-grid">
-      <button type="button" :class="{ selected: modelValue === 'essential' }" @click="$emit('select', 'essential')">
+      <v-btn
+        class="choice-button"
+        :class="{ selected: modelValue === 'essential' }"
+        :color="modelValue === 'essential' ? 'primary' : undefined"
+        :variant="modelValue === 'essential' ? 'tonal' : 'outlined'"
+        size="large"
+        rounded="lg"
+        block
+        @click="$emit('select', 'essential')"
+      >
         {{ t('transaction.essential') }}
-      </button>
-      <button type="button" :class="{ selected: modelValue === 'non-essential' }" @click="$emit('select', 'non-essential')">
+      </v-btn>
+      <v-btn
+        class="choice-button"
+        :class="{ selected: modelValue === 'non-essential' }"
+        :color="modelValue === 'non-essential' ? 'primary' : undefined"
+        :variant="modelValue === 'non-essential' ? 'tonal' : 'outlined'"
+        size="large"
+        rounded="lg"
+        block
+        @click="$emit('select', 'non-essential')"
+      >
         {{ t('transaction.nonEssential') }}
-      </button>
-      <button v-if="optional" type="button" @click="$emit('disable')">
+      </v-btn>
+      <v-btn
+        v-if="optional"
+        class="choice-button"
+        variant="outlined"
+        color="secondary"
+        size="large"
+        rounded="lg"
+        block
+        @click="$emit('disable')"
+      >
         {{ t('transaction.closeStep') }}
-      </button>
+      </v-btn>
     </div>
   </section>
 </template>

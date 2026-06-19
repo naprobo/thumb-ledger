@@ -37,6 +37,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { getLedgerSummary, type LedgerSummary, type SummaryGroup } from '@/api/transactions'
 import { translateLabel } from '@/i18n/labels'
+import { formatMoney } from '@/utils/money'
 
 type TimeRange = 'week' | 'month' | 'year' | 'custom'
 
@@ -55,7 +56,7 @@ const SummaryGroupList = defineComponent({
               props.items.map((item) =>
                 h('li', { key: `${item.key}-${item.currency_code}` }, [
                   h('span', item.key),
-                  h('strong', `${item.amount.toLocaleString()} ${item.currency_code}`),
+                  h('strong', formatMoney(item.amount, item.currency_code)),
                 ]),
               ),
             )
@@ -111,9 +112,9 @@ async function loadSummary() {
 
 <style scoped>
 .page-shell {
-  max-width: 960px;
+  width: min(100%, 1280px);
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px clamp(12px, 3vw, 36px);
 }
 
 .topbar,

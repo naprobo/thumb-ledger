@@ -2,33 +2,51 @@
   <section class="wizard-step">
     <h2>{{ t('transaction.itemName') }}</h2>
     <div class="chip-grid">
-      <button
+      <v-btn
         v-for="item in items"
         :key="item"
-        type="button"
+        class="choice-button"
         :class="{ selected: item === modelValue }"
+        :color="item === modelValue ? 'primary' : undefined"
+        :variant="item === modelValue ? 'tonal' : 'outlined'"
+        size="large"
+        rounded="lg"
+        block
         @click="$emit('select', item)"
       >
         {{ translateLabel(item, t) }}
-      </button>
-      <button type="button" class="add-chip" :class="{ selected: isCustomOpen }" @click="openCustom">
+      </v-btn>
+      <v-btn
+        class="choice-button add-chip"
+        :class="{ selected: isCustomOpen }"
+        :color="isCustomOpen ? 'primary' : undefined"
+        :variant="isCustomOpen ? 'tonal' : 'outlined'"
+        size="large"
+        rounded="lg"
+        block
+        @click="openCustom"
+      >
         <Plus :size="20" aria-hidden="true" />
         <span>{{ t('transaction.customItem') }}</span>
-      </button>
+      </v-btn>
     </div>
-    <label v-if="isCustomOpen" class="custom-item-field">
-      <span>{{ t('transaction.itemName') }}</span>
-      <input
+    <div v-if="isCustomOpen" class="custom-item-field">
+      <v-text-field
         ref="customInput"
         v-model.trim="customValue"
+        class="custom-input"
+        :label="t('transaction.itemName')"
         maxlength="100"
         :placeholder="t('transaction.customItemPlaceholder')"
+        variant="outlined"
+        density="comfortable"
+        hide-details
         @keyup.enter="confirmCustom"
       />
-      <button type="button" class="primary-button" :disabled="!customValue" @click="confirmCustom">
+      <v-btn class="primary-button" color="success" size="large" rounded="lg" :disabled="!customValue" @click="confirmCustom">
         OK
-      </button>
-    </label>
+      </v-btn>
+    </div>
   </section>
 </template>
 
@@ -43,7 +61,7 @@ const emit = defineEmits<{ select: [item: string] }>()
 const { t } = useI18n()
 const isCustomOpen = ref(false)
 const customValue = ref('')
-const customInput = ref<HTMLInputElement | null>(null)
+const customInput = ref<{ focus: () => void } | null>(null)
 
 watch(() => props.modelValue, (value) => {
   if (!value || props.items.includes(value)) return
@@ -64,29 +82,24 @@ function confirmCustom() {
 
 <style scoped>
 .add-chip {
-  display: inline-grid;
-  grid-auto-flow: column;
-  place-content: center;
+  border-style: dashed;
+}
+
+.add-chip :deep(.v-btn__content) {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  border-style: dashed;
 }
 
 .custom-item-field {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 88px;
-  gap: 8px;
-}
-
-.custom-item-field span {
-  grid-column: 1 / -1;
+  align-items: center;
+  gap: 10px;
 }
 
 .primary-button {
   min-width: 88px;
-  border-color: #16a34a;
-  background: #16a34a;
-  color: #fff;
   font-weight: 700;
 }
 </style>

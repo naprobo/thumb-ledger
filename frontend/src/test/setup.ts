@@ -4,6 +4,17 @@ import { createI18n } from 'vue-i18n'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach } from 'vitest'
 import { messages } from '@/i18n'
+import { createAppVuetify } from '@/plugins/vuetify'
+
+class TestResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+if (!globalThis.ResizeObserver) {
+  globalThis.ResizeObserver = TestResizeObserver
+}
 
 // 全局配置 i18n
 const i18n = createI18n({
@@ -13,7 +24,7 @@ const i18n = createI18n({
   messages,
 })
 
-config.global.plugins = [i18n]
+config.global.plugins = [i18n, createAppVuetify()]
 
 // 每个测试前重置 Pinia
 beforeEach(() => {

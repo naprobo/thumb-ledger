@@ -2,15 +2,20 @@
   <section class="wizard-step">
     <h2>{{ t('transaction.category') }}</h2>
     <div class="chip-grid">
-      <button
+      <v-btn
         v-for="category in categories"
         :key="category"
-        type="button"
+        class="choice-button"
         :class="{ selected: category === modelValue }"
+        :color="category === modelValue ? 'primary' : undefined"
+        :variant="category === modelValue ? 'tonal' : 'outlined'"
+        size="large"
+        rounded="lg"
+        block
         @click="$emit('select', category)"
       >
         {{ translateLabel(category, t) }}
-      </button>
+      </v-btn>
     </div>
   </section>
 </template>

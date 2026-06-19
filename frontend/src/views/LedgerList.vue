@@ -98,7 +98,7 @@
       <article v-for="ledger in ledgerStore.ledgers" :key="ledger.id" class="ledger-card">
         <button class="ledger-main" type="button" @click="router.push({ name: 'ledger-detail', params: { id: ledger.id } })">
           <strong>{{ ledger.name }}</strong>
-          <span>{{ modeLabel(ledger.entry_mode) }} · {{ ledger.default_currency_code }}</span>
+          <span>{{ modeLabel(ledger.entry_mode) }} · {{ getCurrencySymbol(ledger.default_currency_code) }}</span>
         </button>
         <button
           type="button"
@@ -133,6 +133,7 @@ import { Settings as SettingsIcon } from '@lucide/vue'
 import { useLedgerStore } from '@/stores/ledgers'
 import type { EntryMode, LedgerCreatePayload } from '@/api/ledgers'
 import { CURRENCY_OPTIONS, currencyOptionLabel } from '@/constants/currencies'
+import { getCurrencySymbol } from '@/utils/money'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -199,9 +200,9 @@ async function submitLedger() {
 
 <style scoped>
 .page-shell {
-  max-width: 960px;
+  width: min(100%, 1280px);
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px clamp(12px, 3vw, 36px);
 }
 
 .topbar,
