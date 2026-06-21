@@ -19,6 +19,16 @@ export interface TransactionCreatePayload {
   subject_ids?: string[]
 }
 
+export interface TransactionUpdatePayload {
+  amount?: number
+  currency_code?: string
+  transaction_date?: string
+  necessity?: Necessity
+  note?: string | null
+  items?: TransactionItemPayload[]
+  subject_ids?: string[]
+}
+
 export interface Transaction {
   id: string
   ledger_id: string
@@ -62,6 +72,24 @@ export interface LedgerSummary {
 export async function createTransaction(ledgerId: string, payload: TransactionCreatePayload): Promise<Transaction> {
   const response = await apiClient.post<Transaction>(`/ledgers/${ledgerId}/transactions`, payload)
   return response.data
+}
+
+export async function getTransaction(ledgerId: string, transactionId: string): Promise<Transaction> {
+  const response = await apiClient.get<Transaction>(`/ledgers/${ledgerId}/transactions/${transactionId}`)
+  return response.data
+}
+
+export async function updateTransaction(
+  ledgerId: string,
+  transactionId: string,
+  payload: TransactionUpdatePayload,
+): Promise<Transaction> {
+  const response = await apiClient.patch<Transaction>(`/ledgers/${ledgerId}/transactions/${transactionId}`, payload)
+  return response.data
+}
+
+export async function deleteTransaction(ledgerId: string, transactionId: string): Promise<void> {
+  await apiClient.delete(`/ledgers/${ledgerId}/transactions/${transactionId}`)
 }
 
 export async function listTransactions(

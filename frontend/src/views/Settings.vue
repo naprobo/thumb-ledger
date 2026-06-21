@@ -11,10 +11,7 @@
         >
           <ChevronLeft :size="24" aria-hidden="true" />
         </button>
-        <div>
-          <h1>{{ t('settings.title') }}</h1>
-          <p v-if="ledger">{{ ledger.name }}</p>
-        </div>
+        <h1>{{ t('settings.title') }}</h1>
       </div>
     </header>
 
@@ -247,8 +244,10 @@ function showToast(message: string, kind: 'success' | 'error') {
   height: 44px;
   min-height: 44px;
   place-items: center;
+  border: 0;
   border-radius: 50%;
   padding: 0;
+  background: transparent;
   line-height: 1;
 }
 
@@ -325,7 +324,8 @@ h2 {
 }
 
 .action-block button {
-  justify-self: start;
+  width: 100%;
+  justify-self: center;
 }
 
 input,
@@ -425,12 +425,16 @@ code {
 
 @media (max-width: 640px) {
   .topbar,
-  .title-row,
   .actions,
   .section-heading,
   .member-list li {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .title-row {
+    align-items: center;
+    flex-direction: row;
   }
 
   .settings-grid {

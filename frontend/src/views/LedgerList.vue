@@ -5,6 +5,16 @@
         <h1>{{ t('nav.ledgers') }}</h1>
         <p>{{ ledgerStore.ledgers.length }}/10</p>
       </div>
+      <button
+        class="create-icon-button"
+        type="button"
+        :disabled="!ledgerStore.canCreateLedger"
+        :aria-label="t('ledger.create')"
+        :title="t('ledger.create')"
+        @click="openWizard"
+      >
+        <Plus :size="24" aria-hidden="true" />
+      </button>
     </header>
 
     <section v-if="showWizard" class="tool-panel" aria-live="polite">
@@ -98,8 +108,9 @@
       <article v-for="ledger in ledgerStore.ledgers" :key="ledger.id" class="ledger-card">
         <button class="ledger-main" type="button" @click="router.push({ name: 'ledger-detail', params: { id: ledger.id } })">
           <strong>{{ ledger.name }}</strong>
-          <span>{{ modeLabel(ledger.entry_mode) }} · {{ getCurrencySymbol(ledger.default_currency_code) }}</span>
+          <span>{{ modeLabel(ledger.entry_mode) }}</span>
         </button>
+        <span class="ledger-total">{{ ledgerTotalLabel(ledger) }}</span>
         <button
           type="button"
           class="settings-icon-button"
@@ -115,12 +126,6 @@
     <p v-if="!ledgerStore.isLoading && ledgerStore.ledgers.length === 0" class="empty-state">
       {{ t('ledger.noLedgers') }}
     </p>
-
-    <div class="bottom-actions">
-      <button class="primary-button" type="button" :disabled="!ledgerStore.canCreateLedger" @click="openWizard">
-        {{ t('ledger.create') }}
-      </button>
-    </div>
   </main>
 </template>
 
@@ -128,12 +133,12 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { Settings as SettingsIcon } from '@lucide/vue'
+import { Plus, Settings as SettingsIcon } from '@lucide/vue'
 
 import { useLedgerStore } from '@/stores/ledgers'
-import type { EntryMode, LedgerCreatePayload } from '@/api/ledgers'
+import type { EntryMode, Ledger, LedgerCreatePayload } from '@/api/ledgers'
 import { CURRENCY_OPTIONS, currencyOptionLabel } from '@/constants/currencies'
-import { getCurrencySymbol } from '@/utils/money'
+import { formatMoneyWithTrailingSymbol } from '@/utils/money'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -176,6 +181,12 @@ function closeWizard() {
 
 function modeLabel(mode: EntryMode): string {
   return mode === 'receipt' ? t('ledger.entryModeReceipt') : t('ledger.entryModeItem')
+}
+
+function ledgerTotalLabel(ledger: Ledger): string {
+  const totals = Object.entries(ledger.total_amounts || {})
+  if (!totals.length) return `${t('summary.total')} ${formatMoneyWithTrailingSymbol(0, ledger.default_currency_code)}`
+  return `${t('summary.total')} ${totals.map(([currency, amount]) => formatMoneyWithTrailingSymbol(amount, currency)).join(' / ')}`
 }
 
 async function submitLedger() {
@@ -223,6 +234,20 @@ h1 {
 .topbar p {
   margin: 4px 0 0;
   color: #607086;
+}
+
+.create-icon-button {
+  display: inline-grid;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  place-items: center;
+  border-radius: 50%;
+  padding: 0;
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
 }
 
 .tool-panel {
@@ -306,11 +331,6 @@ button:disabled {
   gap: 10px;
 }
 
-.bottom-actions {
-  display: grid;
-  margin-top: 18px;
-}
-
 .ledger-card {
   border: 1px solid #d9dee7;
   border-radius: 8px;
@@ -321,6 +341,7 @@ button:disabled {
 .ledger-main {
   display: grid;
   justify-items: start;
+  gap: 4px;
   flex: 1;
   min-width: 0;
   border: 0;
@@ -329,6 +350,13 @@ button:disabled {
 
 .ledger-main span {
   color: #607086;
+}
+
+.ledger-total {
+  min-width: max-content;
+  color: #0f172a;
+  font-size: 1.05rem;
+  font-weight: 800;
 }
 
 .settings-icon-button {
@@ -351,13 +379,20 @@ button:disabled {
 @media (max-width: 640px) {
   .topbar,
   .actions {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
   }
 
   .segmented,
   .grid-two {
     grid-template-columns: 1fr;
+  }
+
+  .ledger-card {
+    align-items: center;
+  }
+
+  .ledger-total {
+    font-size: 0.95rem;
   }
 }
 </style>

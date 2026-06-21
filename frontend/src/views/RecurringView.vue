@@ -324,8 +324,10 @@ function showToast(message: string, kind: 'success' | 'error') {
   height: 44px;
   min-height: 44px;
   place-items: center;
+  border: 0;
   border-radius: 50%;
   padding: 0;
+  background: transparent;
   line-height: 1;
 }
 

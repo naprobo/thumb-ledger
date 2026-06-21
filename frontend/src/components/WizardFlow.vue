@@ -420,8 +420,10 @@ async function resetWizardScroll() {
 .title-action-button {
   display: inline-grid;
   place-items: center;
+  border: 0;
   border-radius: 50%;
   padding: 0;
+  background: transparent;
   line-height: 1;
 }
 

@@ -34,7 +34,7 @@ describe('LedgerList', () => {
     await router.isReady()
     const wrapper = mount(LedgerList, { global: { plugins: [router] } })
 
-    await wrapper.find('button.primary-button').trigger('click')
+    await wrapper.find('.create-icon-button').trigger('click')
 
     expect(wrapper.find('input[maxlength="50"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('1/5')

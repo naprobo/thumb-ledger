@@ -100,19 +100,25 @@
                   </header>
                   <ul class="transaction-list">
                     <li v-for="transaction in group.transactions" :key="transaction.id">
-                      <strong>{{ formatAmount(transaction.amount, transaction.currency_code) }}</strong>
-                      <div class="transaction-main">
-                        <span class="transaction-name">{{ transactionLabel(transaction) }}</span>
-                        <span v-if="transaction.note" class="transaction-note">{{ transaction.note }}</span>
-                      </div>
-                      <v-chip
-                        v-if="ledger?.necessity_step_mode !== 'disabled'"
-                        class="transaction-necessity"
-                        size="x-small"
-                        variant="tonal"
+                      <button
+                        class="transaction-row"
+                        type="button"
+                        @click="router.push({ name: 'transaction-detail', params: { id: ledgerId, transactionId: transaction.id } })"
                       >
-                        {{ necessityLabel(transaction.necessity) }}
-                      </v-chip>
+                        <strong>{{ formatAmount(transaction.amount, transaction.currency_code) }}</strong>
+                        <div class="transaction-main">
+                          <span class="transaction-name">{{ transactionLabel(transaction) }}</span>
+                          <span v-if="transaction.note" class="transaction-note">{{ transaction.note }}</span>
+                        </div>
+                        <v-chip
+                          v-if="ledger?.necessity_step_mode !== 'disabled'"
+                          class="transaction-necessity"
+                          size="x-small"
+                          variant="tonal"
+                        >
+                          {{ necessityLabel(transaction.necessity) }}
+                        </v-chip>
+                      </button>
                     </li>
                   </ul>
                 </section>
@@ -431,6 +437,8 @@ p {
   min-width: 44px;
   height: 44px;
   min-height: 44px;
+  border: 0;
+  background: transparent;
 }
 
 .budget-panel,
@@ -554,16 +562,28 @@ p {
   list-style: none;
 }
 
-.transaction-list li {
+.transaction-row {
   display: grid;
   grid-template-columns: minmax(88px, auto) minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
+  width: 100%;
   min-height: 42px;
+  border: 0;
+  border-radius: 8px;
   padding: 8px 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
 }
 
-.transaction-list strong,
+.transaction-row:hover {
+  background: #f8fafc;
+}
+
+.transaction-row strong,
 .transaction-name,
 .transaction-main,
 .transaction-necessity,
@@ -580,7 +600,7 @@ p {
   font-weight: 600;
 }
 
-.transaction-list li > strong {
+.transaction-row > strong {
   color: #334155;
   font-size: 0.88rem;
   font-weight: 700;
@@ -678,7 +698,7 @@ p {
     gap: 16px;
   }
 
-  .transaction-list li {
+  .transaction-row {
     grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
   }
 
