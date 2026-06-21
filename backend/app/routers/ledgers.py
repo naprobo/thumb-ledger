@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.ledger import Category, HiddenSubject, Ledger, LedgerMember, ShareRequest, Subject
+from app.models.transaction import Transaction
 from app.models.user import User
 from app.schemas.ledger import (
     CategoryCreateRequest,
@@ -77,14 +78,19 @@ async def create_ledger(
 async def list_ledgers(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> list[Ledger]:
+) -> list[LedgerResponse]:
     result = await db.execute(
         select(Ledger)
         .outerjoin(LedgerMember, LedgerMember.ledger_id == Ledger.id)
         .where((Ledger.owner_id == current_user.id) | (LedgerMember.user_id == current_user.id))
         .order_by(Ledger.created_at.desc())
     )
-    return list(result.scalars().unique().all())
+    ledgers = list(result.scalars().unique().all())
+    totals = await _ledger_total_amounts(db, [ledger.id for ledger in ledgers])
+    return [
+        LedgerResponse.model_validate(ledger).model_copy(update={"total_amounts": totals.get(ledger.id, {})})
+        for ledger in ledgers
+    ]
 
 
 @router.get("/{ledger_id}", response_model=LedgerResponse)
@@ -92,10 +98,25 @@ async def get_ledger(
     ledger_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> Ledger:
+) -> LedgerResponse:
     ledger = await get_ledger_or_404(db, ledger_id)
     await require_read_ledger(db, ledger, current_user)
-    return ledger
+    totals = await _ledger_total_amounts(db, [ledger.id])
+    return LedgerResponse.model_validate(ledger).model_copy(update={"total_amounts": totals.get(ledger.id, {})})
+
+
+async def _ledger_total_amounts(db: AsyncSession, ledger_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict[str, int]]:
+    if not ledger_ids:
+        return {}
+    result = await db.execute(
+        select(Transaction.ledger_id, Transaction.currency_code, func.coalesce(func.sum(Transaction.amount), 0))
+        .where(Transaction.ledger_id.in_(ledger_ids))
+        .group_by(Transaction.ledger_id, Transaction.currency_code)
+    )
+    totals: dict[uuid.UUID, dict[str, int]] = {ledger_id: {} for ledger_id in ledger_ids}
+    for ledger_id, currency_code, amount in result.all():
+        totals[ledger_id][currency_code] = int(amount)
+    return totals
 
 
 @router.patch("/{ledger_id}", response_model=LedgerResponse)
@@ -104,14 +125,15 @@ async def update_ledger(
     payload: LedgerUpdateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> Ledger:
+) -> LedgerResponse:
     ledger = await get_ledger_or_404(db, ledger_id)
     require_owner(ledger, current_user)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(ledger, field, value)
     await db.flush()
     await db.refresh(ledger)
-    return ledger
+    totals = await _ledger_total_amounts(db, [ledger.id])
+    return LedgerResponse.model_validate(ledger).model_copy(update={"total_amounts": totals.get(ledger.id, {})})
 
 
 @router.delete("/{ledger_id}")

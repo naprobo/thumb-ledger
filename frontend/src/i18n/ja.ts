@@ -1,6 +1,6 @@
 export default {
   app: {
-    title: 'Thumb Ledger',
+    title: '親指家計簿',
     loading: '読み込み中...',
   },
   common: {
@@ -95,10 +95,16 @@ export default {
     pageTotal: '今月の合計',
     monthTotal: '今月の合計',
     dayTotal: '当日合計',
-    categoryRatio: 'カテゴリ別割合',
-    list: '支出記録',
-    previousPage: '前へ',
-    nextPage: '次へ',
+      categoryRatio: 'カテゴリ別割合',
+      list: '支出記録',
+      detail: '支出詳細',
+      edit: '編集',
+      delete: '削除',
+      deleteConfirm: 'この支出記録を削除しますか？',
+      categoryDetail: '明細',
+      noSubjects: '支出対象なし',
+      previousPage: '前へ',
+      nextPage: '次へ',
   },
   category: {
     food: '食品・飲料',

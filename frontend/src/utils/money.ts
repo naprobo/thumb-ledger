@@ -42,6 +42,25 @@ export function formatMoney(amount: number, currencyCode: string): string {
   return `${symbol}${displayAmount}`
 }
 
+export function formatMoneyWithTrailingSymbol(amount: number, currencyCode: string): string {
+  const code = currencyCode.toUpperCase()
+  const symbol = getCurrencySymbol(code)
+  const displayAmount = formatMinorUnitAmount(amount, currencyFractionDigits(code))
+  return `${displayAmount}${symbol}`
+}
+
+export function formatMoneyInputValue(amount: number, currencyCode: string): string {
+  return formatMinorUnitAmount(amount, currencyFractionDigits(currencyCode))
+}
+
+export function parseMoneyInputValue(value: string, currencyCode: string): number {
+  const normalized = value.replace(/,/g, '').trim()
+  const parsed = Number(normalized)
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0
+  const scale = currencyFractionDigits(currencyCode)
+  return Math.round(parsed * 10 ** scale)
+}
+
 export function getCurrencySymbol(currencyCode: string): string {
   return CURRENCY_SYMBOLS[currencyCode.toUpperCase()] || currencyCode
 }

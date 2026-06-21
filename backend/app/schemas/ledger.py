@@ -56,6 +56,7 @@ class LedgerResponse(BaseModel):
     default_currency_code: str
     timezone: str
     budget_enabled: bool
+    total_amounts: dict[str, int] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
 

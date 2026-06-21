@@ -45,6 +45,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/ledgers/:id/transactions/:transactionId',
+      name: 'transaction-detail',
+      component: () => import('@/views/TransactionDetail.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/ledgers/:id/settings',
       name: 'ledger-settings',
       component: () => import('@/views/Settings.vue'),

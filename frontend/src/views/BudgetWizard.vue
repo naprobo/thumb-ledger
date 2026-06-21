@@ -1,13 +1,21 @@
 <template>
   <main class="page-shell">
     <header class="topbar">
-      <div>
+      <div class="title-row">
+        <button
+          type="button"
+          class="back-button"
+          :aria-label="t('common.back')"
+          :title="t('common.back')"
+          @click="router.push({ name: 'ledger-settings', params: { id: ledgerId } })"
+        >
+          <ChevronLeft :size="24" aria-hidden="true" />
+        </button>
         <h1>{{ t('budget.title') }}</h1>
+      </div>
+      <div class="step-count">
         <p>{{ step + 1 }}/4</p>
       </div>
-      <button type="button" @click="router.push({ name: 'ledger-settings', params: { id: ledgerId } })">
-        {{ t('nav.settings') }}
-      </button>
     </header>
 
     <form class="budget-form" @submit.prevent="nextOrSave">
@@ -59,6 +67,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { ChevronLeft } from '@lucide/vue'
 
 import { saveBudget } from '@/api/budget'
 import { listCategories, type Category } from '@/api/ledgers'
@@ -162,12 +171,38 @@ async function skipBudget() {
 }
 
 .topbar,
+.title-row,
 .actions,
 .switch-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.title-row {
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.back-button {
+  display: inline-grid;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  line-height: 1;
+}
+
+.step-count p {
+  margin: 0;
+  color: #607086;
+  font-weight: 700;
 }
 
 .budget-form {

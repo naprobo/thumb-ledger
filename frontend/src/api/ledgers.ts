@@ -15,6 +15,7 @@ export interface Ledger {
   default_currency_code: string
   timezone: string
   budget_enabled: boolean
+  total_amounts?: Record<string, number>
   created_at: string
   updated_at: string
 }
