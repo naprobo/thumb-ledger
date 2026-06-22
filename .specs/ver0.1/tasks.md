@@ -2,7 +2,7 @@
 
 ## Overview
 
-按分层顺序实现：项目脚手架 → 数据库模型与迁移 → 认证模块 → 审计日志基础与通用 API 校验 → 账本与 Subject 管理 → 默认分类/商品建议与偏好引擎 → 交易核心流程 → 预算模块 → 图片附件 → 定期交易调度 → 导出与统计 → 管理员后台 → 安全加固 → 前端 Vue 3 SPA → 集成收尾。
+按分层顺序实现：项目脚手架 → 数据库模型与迁移 → 认证模块 → 审计日志基础与通用 API 校验 → 账本与 Subject 管理 → 默认分类/商品建议与偏好引擎 → 交易核心流程 → 预算模块 → 图片附件后端预留 → 定期交易调度 → 导出与统计 → 管理员后台 → 安全加固 → 前端 Vue 3 SPA → 共享/个人信息/通知前端完善 → 集成收尾。
 
 技术栈：FastAPI + SQLAlchemy + Alembic + PostgreSQL（后端），Vue 3 + Pinia + vue-i18n + axios（前端），pytest + Hypothesis（测试），Vitest（前端测试），Docker Compose（环境）。
 
@@ -245,21 +245,21 @@
     - **Property 23: 预算进度阈值提示**
     - **Validates: Requirements 20.3, 20.4**
 
-- [x] 10. 图片附件（Image Attachment）
-  - [x] 10.1 实现图片上传与删除 API
+- [x] 10. 图片附件后端预留（Image Attachment Backend Reserve）
+  - [x] 10.1 实现图片上传与删除 API（首个可用版本不要求前端入口）
     - `POST /transactions/{txn_id}/images`：multipart/form-data，每笔交易最多 3 张；校验 magic bytes 确认 JPEG/PNG；单文件 ≤ 5MB（流式读取时提前拒绝）；存储路径写入 `TRANSACTION_IMAGE` 表
     - `DELETE /transactions/{txn_id}/images/{img_id}`：删除数据库记录及对象存储文件
     - 根据 `STORAGE_BACKEND` 环境变量选择本地文件系统 volume 或 S3/MinIO 存储
     - 交易删除时级联调用存储层删除所有关联图片文件
-    - _Requirements: 22.1, 22.2, 22.4, 22.5, 22.6_
+    - _Requirements: 22.2, 22.3_
 
   - [x] 10.2 编写属性测试：图片附件约束（Property 24）
-    - **Property 24: 图片附件约束**
-    - **Validates: Requirements 22.1, 22.2**
+    - **Property 24: 图片附件后端预留约束**
+    - **Validates: Requirements 22.2, 22.3**
 
   - [x] 10.3 编写属性测试：交易删除级联清理图片（Property 25）
-    - **Property 25: 交易删除级联清理图片**
-    - **Validates: Requirements 22.5**
+    - **Property 25: 图片后端级联清理**
+    - **Validates: Requirements 22.3**
 
 - [x] 11. 定期交易调度（Recurring Transaction Service）
   - [x] 11.1 实现定期交易模板 CRUD API
@@ -335,7 +335,7 @@
 
 - [x] 17. 前端：认证页面
   - [x] 17.1 实现注册/登录/密码重置页面
-    - 创建 `src/views/AuthPages.vue`：注册表单（email、password ≥ 8 位）、登录表单、密码重置请求/确认表单
+    - 创建 `src/views/AuthPages.vue`：注册表单（email、password ≥ 8 位、可选 nickname）、登录表单、密码重置请求/确认表单
     - 原生数字输入场景使用 `inputmode="numeric"`；交易金额主流程由 Wizard 自制数字键盘承担
     - 所有交互按钮 tap target ≥ 44×44 CSS px
     - _Requirements: 1.1, 1b.1, 8.1, 8.2, 11.1_
@@ -348,19 +348,19 @@
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 11.3_
 
   - [x] 18.2 实现账本设置页
-    - 创建 `src/views/Settings.vue`：修改账本名称、Subject_Step_Mode（支持重新启用）、Necessity_Step_Mode、预算配置入口、共享成员管理、语言切换
-    - _Requirements: 2.8, 5.9, 9.8, 14.2_
+    - 创建 `src/views/Settings.vue`：修改账本名称、Subject_Step_Mode（支持重新启用）、Necessity_Step_Mode、预算配置入口、共享码与共享成员管理
+    - _Requirements: 2.8, 5.9, 9.8_
 
 - [x] 19. 前端：Wizard Flow（记账向导）
   - [x] 19.1 实现 WizardFlow 状态机容器
     - 创建 `src/components/WizardFlow.vue`：维护步骤顺序数组；receipt 模式为 Amount → Category → Necessity → Subject，item 模式为 Amount → Category → Item → Necessity → Subject，根据账本配置动态启/禁步骤
     - 步骤完成后自动跳转下一步（无需点击 Next），支持返回上一步
     - 步骤切换和完成页显示时重置滚动位置到顶部
-    - Entry_Mode=item 时进入 Category→Item→Necessity 步骤；Entry_Mode=receipt 时选择 Category 后跳过 Item
+    - Entry_Mode=item 时进入 Category→Item→Necessity 步骤并保存单个消费名称；Entry_Mode=receipt 时选择 Category 后跳过 Item
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.6_
 
   - [x] 19.2 实现各 Wizard 步骤组件
-    - `WizardStepAmount.vue`：应用内自制数字键盘，顶部计算器式金额显示，OK 后进入下一步（默认 Ledger 默认货币）
+    - `WizardStepAmount.vue`：应用内自制数字键盘，顶部计算器式金额显示，OK 后进入下一步（一账本一货币，使用 Ledger 默认货币）
     - `WizardStepCategory.vue`：分类 chip 列表（偏好排序），tap 即选中
     - `WizardStepItem.vue`：消费名称 chip 列表（偏好排序）+ `+ 自定义` chip 触发手动输入文本框；仅在 Entry_Mode=item 时出现
     - `WizardStepNecessity.vue`：刚需/非刚需两选项，不默认选择、不超时自动保存，提供与普通选项同等级的大块"关闭此步骤"按钮
@@ -492,6 +492,52 @@
     - 后端集成测试：私有建议权限、作者不可自投、Admin 可查看所有建议并更新状态
     - 前端 Vitest：建议提交、我的建议/公开建议 tab、支持/反对按钮、Admin 建议管理
     - _Requirements: 27.1 - 27.12_
+
+- [ ] 28. 账本共享、个人信息与通知中心完善
+  - [ ] 28.1 扩展用户资料模型与认证 API
+    - User 增加 `nickname` 字段，注册时可选输入 nickname
+    - `GET /auth/me` 返回 nickname 与 display_name
+    - `PATCH /auth/me/profile` 支持创建、更新、清空 nickname，并继续支持语言偏好持久化
+    - `POST /auth/me/change-password` 支持登录用户输入当前密码后修改密码，并使旧 JWT 失效
+    - _Requirements: 1.1a, 1c.1, 1c.2, 1c.3, 1c.4, 1c.5, 1c.6, 14.4_
+
+  - [ ] 28.2 完善共享 API 响应与成员权限变更
+    - Share_Request、LedgerMember 响应包含用户 email、nickname、display_name
+    - 新增或补齐 `PATCH /ledgers/{id}/members/{user_id}`，Owner 可修改成员 role
+    - 移除/停止共享时生成 Notification，并保持只读/可写权限立即生效
+    - _Requirements: 9.3, 9.5, 9.6, 9.12, 9.13, 9.14, 9.15, 9.16_
+
+  - [ ] 28.3 实现通知 API
+    - `GET /notifications`、`GET /notifications/unread-count`
+    - `POST /notifications/{id}/read`、`POST /notifications/read-all`
+    - 共享申请、批准、拒绝、权限变更、移除成员均生成通知
+    - _Requirements: 28.1, 28.2, 28.3, 28.4, 28.5, 28.6, 28.7, 28.8, 28.9_
+
+  - [ ] 28.4 实现前端个人信息页面
+    - 右上角汉堡菜单新增“个人信息”入口
+    - `ProfileView.vue` 显示 email，编辑 nickname，修改密码
+    - 将账号注销入口放在危险操作区域
+    - _Requirements: 1c.1, 1c.2, 1c.3, 1c.5, 1c.7_
+
+  - [ ] 28.5 实现前端通知铃铛与通知列表
+    - 汉堡菜单左侧显示 bell icon
+    - 未读通知显示红点
+    - 点击进入通知列表或抽屉，可标记单条/全部已读
+    - 通知文案使用 i18n，用户名显示 nickname fallback email
+    - _Requirements: 28.1 - 28.9_
+
+  - [ ] 28.6 完善前端账本共享流程
+    - 设置页分享码显示框右侧增加 copy icon，并使用顶栏下方居中 toast 提示复制结果
+    - 右上角菜单新增“加入共享账本”入口，输入分享码提交申请
+    - 设置页 Owner 可查看待审批申请，批准/拒绝，并选择 read-only / read-write
+    - 成员列表显示 nickname fallback email；点击成员进入详情页，可修改权限或停止共享
+    - _Requirements: 9.1 - 9.16_
+
+  - [ ] 28.7 增加共享/通知/个人信息测试
+    - 后端属性测试：通知未读计数一致性（Property 30）、共享成员权限变更生效（Property 31）
+    - 后端集成测试：申请加入 → Owner 收通知 → 批准/拒绝 → 申请人收通知 → 标记已读
+    - 前端 Vitest：ProfileView、NotificationBell、NotificationsView、ShareJoinView、ShareMemberView、Settings 共享区
+    - _Requirements: 1c, 9, 28_
 
 ---
 

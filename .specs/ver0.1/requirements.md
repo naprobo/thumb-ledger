@@ -10,7 +10,7 @@
 
 ## Glossary
 
-- **User（用户）**: 已注册并登录系统的账户持有人
+- **User（用户）**: 已注册并登录系统的账户持有人；可选设置昵称（nickname），昵称存在时优先作为对其他用户显示的名称
 - **Owner（账本持有人）**: 创建该账本的 User，拥有账本的最高权限
 - **Ledger（账本）**: 用户创建的记账本，包含该账本的配置与所有交易记录
 - **Transaction（交易）**: 账本中的一笔记录，可以是单张小票或单个商品
@@ -23,7 +23,7 @@
 - **Item（消费名称 / 明细）**: 属于某个 Category 下的具体消费名称（如"牛奶"、"T恤"、"油费"、"车检"）。
 - **Suggestion（建议）**: 用户提交给系统运营者的功能需求、问题反馈或改进意见，可选择公开以寻求其他用户支持或反对
 - **Suggestion_Vote（建议投票）**: 用户对公开 Suggestion 表达支持或反对的记录，每个用户对同一建议最多保留一个当前立场
-- **Notification（通知）**: 系统向用户提示待处理共享申请、审批结果等事件的机制；MVP 采用站内状态查询与可选邮件通知
+- **Notification（通知）**: 系统向用户提示待处理共享申请、审批结果等事件的机制；MVP 采用顶部通知铃铛、通知列表与可选邮件通知
 - **Wizard_Flow（向导流程）**: 分屏步进式输入界面，每屏只呈现一个输入步骤
 - **Preference_Engine（偏好引擎）**: 记录用户选择频次并对标签排序的后端模块
 - **Share_Request（共享申请）**: 某 User 申请加入某 Ledger 的待审核请求
@@ -31,7 +31,7 @@
 - **Admin（系统管理员）**: 拥有最高权限的特殊用户角色，可管理所有用户账号和系统配置
 - **Password_Reset_Token（密码重置令牌）**: 发送至用户邮箱的一次性短期令牌，用于密码找回流程
 - **Migration（数据库迁移）**: 使用版本化脚本对数据库 schema 进行可追溯的增量变更
-- **Currency_Code（货币代码）**: 遵循 ISO 4217 标准的三字母货币代码（如 JPY、CNY、USD）
+- **Currency_Code（货币代码）**: 遵循 ISO 4217 标准的三字母货币代码（如 JPY、CNY、USD）；MVP 采用一账本一货币，不在单笔交易中混用货币
 - **Recurring_Transaction（定期交易）**: 按预设周期自动生成的交易记录（如每月房租、水电费）
 - **Audit_Log（审计日志）**: 记录关键操作（登录、共享变更、Admin 操作）的时间戳与来源 IP 的系统日志
 - **Budget（预算）**: 账本级别的可选功能，设定月度或年度总支出上限及各 Category 的细分金额
@@ -55,11 +55,28 @@
 #### Acceptance Criteria
 
 1. THE Auth_Service SHALL provide a registration endpoint that accepts a unique email address and a password of at least 8 characters.
+1a. THE Auth_Service SHALL allow registration to include an optional nickname; WHEN nickname is omitted, THE System SHALL use the User's email as the fallback display name.
 2. WHEN a registration request is received with a duplicate email, THE Auth_Service SHALL return an error indicating the email is already in use.
 3. WHEN a valid login request is received, THE Auth_Service SHALL return a JWT Token with an expiry of 7 days.
 4. IF a login request contains an incorrect email or password, THEN THE Auth_Service SHALL return an authentication failure error without revealing which field is incorrect.
 5. WHILE a Token is valid, THE API SHALL accept the Token in the Authorization header to authenticate requests.
 6. WHEN a Token has expired, THE API SHALL return a 401 Unauthorized response.
+
+---
+
+### Requirement 1c：个人信息与密码修改
+
+**User Story:** As a logged-in user, I want to manage my display name and password, so that shared ledgers can identify me clearly and my account remains secure.
+
+#### Acceptance Criteria
+
+1. THE System SHALL provide a Profile page accessible from the authenticated top-right menu.
+2. THE Profile page SHALL display the User's email and nickname.
+3. THE Profile page SHALL allow the User to create, update, or clear their nickname.
+4. WHEN a User is displayed in shared-ledger member lists, share requests, notifications, or admin views, THE System SHALL prefer nickname and fall back to email.
+5. THE Profile page SHALL allow the User to change their password by entering the current password and a new password of at least 8 characters.
+6. WHEN a password is changed successfully, THE Auth_Service SHALL invalidate existing JWT Tokens for that User and require re-login.
+7. THE Profile page SHOULD expose account deletion as a clearly separated danger-zone action, because it is already part of account lifecycle management and should not be hidden in general settings.
 
 ---
 
@@ -144,7 +161,7 @@
 4a. THE Wizard_Flow SHALL allow the User to navigate back with a single tap from the title bar: on the Amount step this returns to the Ledger home, and on later steps this returns to the previous step.
 4b. WHEN THE Wizard_Flow advances to a new step or to the completion prompt, THE visible scroll position SHALL reset to the top of the Wizard screen.
 5. WHEN the User reaches the final step and confirms, THE Wizard_Flow SHALL save the Transaction and display a completion prompt.
-6. WHEN Entry_Mode is "item", THE Wizard_Flow SHALL repeat the Category → Item name → Necessity steps for each additional item the User chooses to add.
+6. WHEN Entry_Mode is "item", THE Wizard_Flow SHALL create one Transaction containing one Category-guided Item name. Multi-item entry is deferred beyond MVP to avoid losing partially entered multi-step state during network interruption or accidental navigation.
 7. WHEN Subject_Step_Mode is "optional", THE Wizard_Flow SHALL display a "以后不再问" (skip and don't ask again) option on the Subject selection step, operable with a single tap.
 8. WHEN the User taps "以后不再问" on the Subject step, THE Ledger_Service SHALL set Subject_Step_Mode to "disabled" for that Ledger, and THE Wizard_Flow SHALL omit the Subject step in all subsequent Transactions for that Ledger.
 9. WHEN Subject_Step_Mode is "disabled", THE Ledger_Service SHALL allow the Owner to re-enable it from the Ledger settings screen, which SHALL restore Subject_Step_Mode to "optional".
@@ -178,8 +195,8 @@
 #### Acceptance Criteria
 
 1. WHEN a User opens a Ledger, THE Transaction_Service SHALL present a compact plus icon action beside the Ledger name to start recording a new Transaction; Ledger settings SHALL be represented by a gear icon beside it with enough spacing to reduce accidental taps.
-2. WHEN Entry_Mode is "receipt", THE Transaction_Service SHALL require a total amount and Category, with optional note and no mandatory Item name breakdown.
-3. WHEN Entry_Mode is "item", THE Transaction_Service SHALL allow the User to add one or more items, each with an amount and a Category-guided name.
+2. WHEN Entry_Mode is "receipt", THE Transaction_Service SHALL require a total amount and Category, with no mandatory Item name breakdown; optional note MAY be added later from the Transaction detail edit screen rather than during the fast recording Wizard.
+3. WHEN Entry_Mode is "item", THE Transaction_Service SHALL allow the User to record one item with an amount and a Category-guided name per Wizard run.
 4. THE Transaction_Service SHALL allow the User to record the transaction date, defaulting to the current date.
 5. THE Transaction_Service SHALL record a Currency_Code (ISO 4217) for each Transaction, defaulting to the Ledger's configured currency.
 6. WHEN a Transaction is saved successfully, THE Transaction_Service SHALL persist the record and return a success response within 500ms.
@@ -215,6 +232,14 @@
 6. WHEN a shared User is removed, THE Ledger_Service SHALL immediately revoke that User's access to the Ledger.
 7. THE Ledger_Service SHALL allow a Ledger to have at most 10 shared Users in addition to the Owner.
 8. THE Ledger_Service SHALL display the list of current shared Users to the Owner.
+9. WHEN the Owner taps the share-code control in Ledger settings, THE frontend SHALL display the share code with a copy icon button beside the code field.
+10. WHEN the copy icon is tapped, THE frontend SHALL copy the share code to the clipboard and show a top-floating toast below the app bar.
+11. THE authenticated top-right menu SHALL provide an entry for joining a shared Ledger by entering a share code or opening a share link.
+12. THE Ledger settings screen SHALL display pending Share_Requests to the Owner, using requester display name (nickname fallback email), requested role, status, and approve/reject actions.
+13. THE Owner SHALL be able to choose or modify the approved member's Share_Role as read-only or read-write.
+14. THE shared member list SHALL display each member by nickname when available, otherwise by email.
+15. WHEN the Owner taps a member name, THE System SHALL open a member detail screen where the Owner can change the member's role or stop/remove sharing for that member.
+16. WHEN sharing is stopped or a member is removed, THE System SHALL create an in-app Notification for the affected member.
 
 ---
 
@@ -285,7 +310,7 @@
 #### Acceptance Criteria
 
 1. THE I18n_Service SHALL support the following three languages: 简体中文（zh-CN）、English（en）、日本語（ja）.
-2. THE System SHALL allow the User to switch the display language from the authenticated top-right menu and from a settings screen with a single tap selection.
+2. THE System SHALL allow the User to switch the display language from the authenticated top-right menu with a single tap selection; language is a user preference, not a Ledger property.
 3. WHEN the User selects a language, THE I18n_Service SHALL apply the new language to all UI text within 300ms without requiring a page reload.
 4. THE I18n_Service SHALL persist the User's language preference and apply it automatically on subsequent sessions.
 5. WHEN no language preference is stored, THE I18n_Service SHALL default to the language reported by the browser's `navigator.language`, falling back to 简体中文 if the reported language is not among the supported three.
@@ -390,33 +415,31 @@
 
 ---
 
-### Requirement 21：多货币支持（ISO 4217）
+### Requirement 21：账本货币支持（ISO 4217）
 
-**User Story:** As a user, I want each transaction to record its currency code, so that my records remain accurate even when spending in different currencies.
+**User Story:** As a user, I want each ledger to have a clear currency, so that records and totals remain simple and predictable.
 
 #### Acceptance Criteria
 
 1. WHEN a Ledger is created, THE Ledger_Service SHALL require the User to select a default Currency_Code from the ISO 4217 standard (e.g. JPY, CNY, USD).
-2. WHEN a new Transaction is started, THE Wizard_Flow SHALL pre-fill the currency with the Ledger's default Currency_Code.
-3. THE Transaction_Service SHALL allow the User to override the currency per Transaction by selecting a different ISO 4217 Currency_Code.
+2. WHEN a new Transaction is started, THE Wizard_Flow SHALL use the Ledger's default Currency_Code.
+3. THE Product SHALL NOT expose per-Transaction currency override in MVP; mixed-currency ledgers are deferred for future discussion.
 4. THE Transaction_Service SHALL store amounts as integers in the smallest unit of the selected currency (e.g. yen for JPY, fen for CNY, cents for USD) to avoid floating-point precision errors.
 5. WHEN displaying amounts, THE System SHALL format them according to the selected Currency_Code and the User's locale.
-6. THE Transaction_Service SHALL group summary totals by Currency_Code and SHALL NOT mix amounts of different currencies.
+6. THE Transaction_Service SHALL keep currency_code on Transactions for data integrity and future compatibility, but normal MVP UI SHALL present one currency per Ledger.
 
 ---
 
-### Requirement 22：小票图片附件
+### Requirement 22：小票图片附件（Future / Deferred）
 
 **User Story:** As a user, I want to attach a photo of my receipt to a transaction, so that I have a visual record for verification.
 
 #### Acceptance Criteria
 
-1. WHEN recording a Transaction, THE Transaction_Service SHALL provide an optional step to attach up to 3 images per Transaction.
-2. THE System SHALL accept image files in JPEG or PNG format with a maximum size of 5 MB per file.
-3. WHEN an image is attached, THE System SHALL display a thumbnail preview of the image within the Transaction detail view.
-4. THE System SHALL store uploaded images in a server-side object storage location and SHALL NOT store binary image data directly in the PostgreSQL database.
-5. WHEN a Transaction is deleted, THE System SHALL also delete all image files associated with that Transaction.
-6. THE image attachment step SHALL be skippable with a single tap and SHALL NOT block Transaction saving.
+1. Image attachment is not part of the first usable release scope.
+2. Existing backend image APIs MAY remain as dormant infrastructure, but the MVP frontend SHALL NOT be required to expose image upload, thumbnail preview, or image deletion UI.
+3. WHEN image attachment is resumed in a future release, THE System SHOULD allow up to 3 JPEG/PNG images per Transaction, each no larger than 5 MB, stored outside PostgreSQL binary columns.
+4. Future image attachment SHALL be optional and SHALL NOT block fast Transaction saving.
 
 ---
 
@@ -500,3 +523,21 @@
 10. THE Admin_Service SHALL provide an admin-only Suggestions view listing all Suggestions, including private Suggestions, author email, public status, support count, opposition count, created time, and current status.
 11. THE Admin_Service SHALL allow an Admin to mark a Suggestion as new, reviewing, planned, completed, or declined.
 12. ALL Suggestion_Service and Admin Suggestion endpoints SHALL enforce authentication, authorization, string length validation, and XSS-safe rendering.
+
+---
+
+### Requirement 28：通知中心
+
+**User Story:** As a user, I want to see important sharing events from a notification bell, so that I do not miss requests or approval results.
+
+#### Acceptance Criteria
+
+1. THE authenticated app header SHALL display a notification bell icon immediately to the left of the top-right menu.
+2. WHEN unread Notifications exist, THE bell SHALL show a red dot indicator.
+3. WHEN the User taps the bell, THE System SHALL open a Notification view or drawer listing recent Notifications.
+4. Notification items SHALL include at minimum: type, human-readable message, related Ledger display name where applicable, created time, and read/unread state.
+5. THE System SHALL create a Notification when another User requests to join one of the Owner's Ledgers.
+6. THE System SHALL create a Notification when a Share_Request is approved or rejected.
+7. THE System SHALL create a Notification when a shared member's role is changed or their sharing access is removed.
+8. THE User SHALL be able to mark Notifications as read; after all are read, the bell red dot SHALL disappear.
+9. Notification text SHALL use i18n messages and display Users by nickname when available, otherwise email.

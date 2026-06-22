@@ -7,9 +7,9 @@
 - **后端**：FastAPI（Python），提供 RESTful API，负责业务逻辑、认证、数据持久化
 - **前端**：Vue 3（SPA），针对移动端单手操作优化，实现分屏向导式 UI
 - **数据库**：PostgreSQL，通过 SQLAlchemy ORM 访问，Alembic 管理 Schema 迁移
-- **存储**：服务端对象存储（如本地文件系统挂载或 S3 兼容服务）用于小票图片
+- **存储**：服务端对象存储（如本地文件系统挂载或 S3 兼容服务）预留给未来小票图片；首个可用版本不要求前端图片附件入口
 
-核心目标：以最少的点击次数完成一笔记账，支持多账本、账本共享、预算追踪、智能排序、多货币、多语言。
+核心目标：以最少的点击次数完成一笔记账，支持多账本、账本共享、预算追踪、智能排序、一账本一货币、多语言。
 
 ---
 
@@ -94,6 +94,8 @@ sequenceDiagram
 - `POST /auth/login` — 登录，返回 JWT（7天有效）
 - `POST /auth/password-reset/request` — 发起密码重置
 - `POST /auth/password-reset/confirm` — 确认密码重置
+- `PATCH /auth/me/profile` — 更新当前用户昵称、语言等个人偏好
+- `POST /auth/me/change-password` — 当前用户输入旧密码后修改密码，并使旧 JWT 失效
 - `DELETE /auth/account` — 账号注销（需输入当前密码）
 
 限流（由 Rate Limiter 中间件实施）：
@@ -117,9 +119,22 @@ sequenceDiagram
 - `POST /ledgers/{id}/share-requests/{req_id}/approve` — 批准
 - `POST /ledgers/{id}/share-requests/{req_id}/reject` — 拒绝
 - `GET /ledgers/{id}/members` — 查看共享成员列表
+- `PATCH /ledgers/{id}/members/{user_id}` — 修改共享成员权限（read-only / read-write）
 - `DELETE /ledgers/{id}/members/{user_id}` — 移除共享成员
 
-共享通知采用两层机制：MVP 必须通过待审申请列表和申请状态字段在应用内可见；若 SMTP 已配置，则同步发送邮件通知 Owner 或申请人。后续可在此基础上扩展站内通知中心或 Web Push。
+共享通知采用两层机制：MVP 必须通过顶部通知铃铛、通知列表、待审申请列表和申请状态字段在应用内可见；若 SMTP 已配置，则同步发送邮件通知 Owner 或申请人。后续可在此基础上扩展 Web Push。
+
+#### Notification Service
+- `GET /notifications` — 当前用户查看通知列表
+- `GET /notifications/unread-count` — 当前用户未读通知数，用于顶部铃铛红点
+- `POST /notifications/{id}/read` — 标记单条通知为已读
+- `POST /notifications/read-all` — 标记全部通知为已读
+
+通知来源：
+- 共享申请创建：通知账本 Owner
+- 共享申请批准/拒绝：通知申请人
+- 共享成员权限变更或移除：通知被影响成员
+- 预算告警、系统公告等可复用同一 Notification 表扩展
 
 #### Transaction Service
 - `POST /ledgers/{id}/transactions` — 创建交易
@@ -176,9 +191,11 @@ sequenceDiagram
 - 建议作者不可对自己的建议投票
 - 每个用户对同一建议最多保留一条当前投票记录
 
-#### Image Attachment
+#### Image Attachment（Future / Deferred）
 - `POST /transactions/{txn_id}/images` — 上传图片（multipart/form-data，最多 3 张，每张 ≤ 5MB，JPEG/PNG）
 - `DELETE /transactions/{txn_id}/images/{img_id}` — 删除图片
+
+图片附件后端接口可作为预留能力存在；首个可用版本不要求前端在 Wizard 或交易详情中暴露上传、缩略图、删除图片入口。
 
 ### 前端模块（Vue 3）
 
@@ -190,7 +207,12 @@ sequenceDiagram
 | `LedgerDetail.vue` | 账本详情（交易列表 + 预算进度） |
 | `BudgetWizard.vue` | 预算设置向导 |
 | `SummaryView.vue` | 统计汇总页 |
-| `Settings.vue` | 账本设置、语言切换 |
+| `Settings.vue` | 账本设置、共享码、待审批申请、成员列表入口 |
+| `ShareJoinView.vue` | 输入分享码或打开分享链接，提交加入申请 |
+| `ShareMemberView.vue` | 共享成员详情，修改权限或停止共享 |
+| `ProfileView.vue` | 个人信息、昵称编辑、密码修改、账号注销入口 |
+| `NotificationBell.vue` | 顶部通知铃铛与未读红点 |
+| `NotificationsView.vue` | 通知列表、标记已读 |
 | `SuggestionsView.vue` | 用户提交建议、查看自己的建议、浏览公开建议并支持/反对 |
 | `AuthPages.vue` | 注册 / 登录 / 密码重置 |
 | `AdminPanel.vue` | 管理员后台；包含用户管理、系统统计与建议管理入口 |
@@ -208,6 +230,9 @@ Wizard Flow 前端交互约束：
 - `LedgerDetail.vue`、Wizard 各步骤及消费记录列表静态文案均必须通过 `vue-i18n` 消息键渲染，测试需防止 `transaction.list`、`transaction.monthTotal` 等裸 key 暴露到 UI。
 - `LedgerDetail.vue` 以月份为单位查询并展示消费记录，本月合计来自当前月日期范围；底部使用上一月/下一月按钮，不显示页码。
 - 已登录全局顶部菜单提供语言切换入口，复用 `AuthStore.updatePreferredLanguage()` 同步本地偏好与后端用户偏好。
+- 已登录全局顶部栏在汉堡菜单左侧显示通知铃铛；未读通知数大于 0 时显示红点，点击进入通知列表。
+- 账本设置页的分享码区域使用只读 code/input 加 copy icon 按钮；复制成功/失败提示使用顶栏下方居中的浮动 toast。
+- 共享成员、共享申请、通知和 Admin 用户列表中的用户显示名统一走 `display_name = nickname || email`。
 
 ---
 
@@ -220,6 +245,7 @@ erDiagram
     USER {
         uuid id PK
         string email UK
+        string nickname
         string password_hash
         bool is_active
         bool is_admin
@@ -434,6 +460,8 @@ erDiagram
 
 **金额精度**：所有金额字段使用 `BIGINT` 存储货币最小单位（日元存 ¥，人民币存分，美元存 cents），避免浮点精度问题。
 
+**USER.nickname**：可为空，最大长度建议 50。所有面向其他用户的显示位置使用 `display_name = nickname || email`，包括共享申请、共享成员、通知、Admin 用户列表和建议作者信息。
+
 **entry_mode**：账本级枚举，`receipt`（一张小票）或 `item`（逐商品）。
 
 **subject_step_mode**：`required` | `optional` | `disabled`
@@ -448,7 +476,7 @@ erDiagram
 
 **TRANSACTION_ITEM.category_name_snapshot**：保存记账当时的分类名称快照，确保后续自定义分类重命名或删除不改变历史交易显示。
 
-**NOTIFICATION 表**：MVP 用于记录共享申请、审批结果等站内可见状态；邮件发送是辅助通道，不能作为唯一状态来源。
+**NOTIFICATION 表**：MVP 用于记录共享申请、审批结果、共享成员权限变更/移除等站内可见状态；邮件发送是辅助通道，不能作为唯一状态来源。`read_at IS NULL` 表示未读，顶部铃铛红点基于未读数量。
 
 **SUGGESTION 表**：保存用户建议；`status` = `new` | `reviewing` | `planned` | `completed` | `declined`；`is_public=False` 时仅作者和 Admin 可见。
 
@@ -677,19 +705,19 @@ class Transaction(Base):
 
 ---
 
-### Property 24: 图片附件约束
+### Property 24: 图片附件后端预留约束
 
-*For any* transaction, uploading a 4th image SHALL be rejected; *and* uploading any file exceeding 5 MB or with a MIME type other than `image/jpeg` or `image/png` SHALL be rejected with a 422 error.
+*For any* dormant image-upload backend endpoint kept for future use, uploading a 4th image SHALL be rejected; *and* uploading any file exceeding 5 MB or with a MIME type other than `image/jpeg` or `image/png` SHALL be rejected with a 422 error.
 
-**Validates: Requirements 22.1, 22.2**
+**Validates: Requirements 22.2, 22.3**
 
 ---
 
-### Property 25: 交易删除级联清理图片
+### Property 25: 图片后端级联清理
 
-*For any* transaction with attached images, after the transaction is deleted, all image files associated with that transaction SHALL no longer be accessible and SHALL be removed from object storage.
+*For any* transaction with attached images created through the dormant backend image API, after the transaction is deleted, all image files associated with that transaction SHALL no longer be accessible and SHALL be removed from object storage.
 
-**Validates: Requirements 22.5**
+**Validates: Requirements 22.3**
 
 ---
 
@@ -722,6 +750,22 @@ class Transaction(Base):
 *For any* public Suggestion and authenticated User who is not the author, after any sequence of support/opposition votes by that User on that Suggestion, the database SHALL contain exactly one vote row for that `(suggestion_id, user_id)` pair and its `vote_type` SHALL equal the most recent vote submitted.
 
 **Validates: Requirements 27.6, 27.7, 27.8**
+
+---
+
+### Property 30: 通知未读计数一致性
+
+*For any* authenticated User, the unread notification count SHALL equal the number of that User's Notification rows where `read_at IS NULL`; after marking a notification as read, that notification SHALL no longer contribute to the unread count.
+
+**Validates: Requirements 28.2, 28.4, 28.8**
+
+---
+
+### Property 31: 共享成员权限变更生效
+
+*For any* shared Ledger member, when the Owner changes the member role to read-only, write endpoints for that Ledger SHALL return 403 for that member; when changed back to read-write, creating Transactions SHALL be allowed again.
+
+**Validates: Requirements 9.3, 9.13, 9.15**
 
 ---
 
@@ -862,6 +906,10 @@ def test_transaction_list_order(transactions):
 - 语言切换后 i18n 消息键正确替换
 - 顶部菜单语言切换调用用户偏好持久化接口
 - SuggestionsView 提交建议、我的建议、公开建议 tab、支持/反对按钮状态
+- ProfileView 显示邮箱、编辑 nickname、修改密码表单校验与成功后重新登录提示
+- NotificationBell 未读红点、NotificationsView 标记已读、通知文案 i18n 渲染
+- Settings 共享码复制按钮、待审批申请 approve/reject、成员列表显示 nickname fallback email
+- ShareJoinView 输入分享码提交申请，ShareMemberView 修改成员权限与停止共享
 - 账本详情页消费记录和本月合计显示翻译文案，不暴露 `transaction.*` 裸 key
 - 预算进度条组件在 80% / 100% 时显示正确样式类
 
@@ -869,6 +917,9 @@ def test_transaction_list_order(transactions):
 
 - 完整注册 → 登录 → 创建账本 → 记账 → 查看列表流程
 - 账本共享申请 → 批准 → 只读用户尝试写入（返回 403）
+- 账本共享成员权限 read-write → read-only → read-write 的权限变化
+- 共享申请、审批、移除成员分别生成通知，未读计数和标记已读正确
+- 用户注册/更新 nickname 后，共享成员、申请、通知返回 display_name
 - 账本删除 → 验证交易和 share_requests 均已删除
 - 账号注销 → 验证所有相关数据清除
 - CSV 导出 → 验证行数与数据库记录一致
