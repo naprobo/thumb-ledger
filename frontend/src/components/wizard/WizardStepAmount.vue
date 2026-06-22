@@ -43,7 +43,6 @@
         <VueDatePicker
           :model-value="props.transactionDate"
           model-type="yyyy-MM-dd"
-          :max-date="todayIso"
           :locale="datepickerLocale"
           :week-start="datepickerWeekStart"
           :enable-time-picker="false"
@@ -117,8 +116,7 @@ function openCalendar() {
 function selectCalendarDate(value: string | Date | null) {
   if (!value) return
   const isoValue = typeof value === 'string' ? value : formatIsoDate(value)
-  const selected = isoValue > todayIso.value ? todayIso.value : isoValue
-  emit('dateChange', selected)
+  emit('dateChange', isoValue)
   isCalendarOpen.value = false
 }
 

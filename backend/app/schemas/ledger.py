@@ -102,10 +102,17 @@ class ShareRequestCreateRequest(BaseModel):
     role: ShareRole = "read-write"
 
 
+class MemberRoleUpdateRequest(BaseModel):
+    role: ShareRole
+
+
 class ShareRequestResponse(BaseModel):
     id: uuid.UUID
     ledger_id: uuid.UUID
     requester_id: uuid.UUID
+    requester_email: Optional[str] = None
+    requester_nickname: Optional[str] = None
+    requester_display_name: Optional[str] = None
     role: str
     status: str
     created_at: datetime
@@ -118,6 +125,9 @@ class MemberResponse(BaseModel):
     id: uuid.UUID
     ledger_id: uuid.UUID
     user_id: uuid.UUID
+    email: Optional[str] = None
+    nickname: Optional[str] = None
+    display_name: Optional[str] = None
     role: str
     joined_at: Optional[datetime]
 

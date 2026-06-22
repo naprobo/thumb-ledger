@@ -17,11 +17,13 @@ from app.database import get_db
 from app.models.audit_log import AuditLog
 from app.models.user import PasswordResetToken, User
 from app.schemas.auth import (
+    ChangePasswordRequest,
     DeleteAccountRequest,
     LanguagePreferenceRequest,
     LoginRequest,
     PasswordResetConfirmSchema,
     PasswordResetRequestSchema,
+    ProfileUpdateRequest,
     RegisterRequest,
     TokenResponse,
     UserResponse,
@@ -112,7 +114,8 @@ async def register(
             detail="Email is already registered",
         )
 
-    user = User(email=email, password_hash=hash_password(payload.password))
+    nickname = payload.nickname.strip() if payload.nickname else None
+    user = User(email=email, nickname=nickname or None, password_hash=hash_password(payload.password))
     db.add(user)
     await db.flush()
     await write_audit_log(db, REGISTER, user.id, _source_ip(request), {"email": email})
@@ -169,6 +172,41 @@ async def update_my_preferences(
     current_user.preferred_language = payload.preferred_language
     await db.flush()
     return current_user
+
+
+@router.patch("/me/profile", response_model=UserResponse)
+async def update_my_profile(
+    payload: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    changes = payload.model_dump(exclude_unset=True)
+    if "nickname" in changes:
+        nickname = changes["nickname"].strip() if changes["nickname"] else None
+        current_user.nickname = nickname or None
+    if changes.get("preferred_language") is not None:
+        current_user.preferred_language = changes["preferred_language"]
+    await db.flush()
+    return current_user
+
+
+@router.post("/me/change-password")
+async def change_my_password(
+    request: Request,
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=GENERIC_LOGIN_ERROR,
+        )
+    current_user.password_hash = hash_password(payload.new_password)
+    current_user.password_changed_at = datetime.now(timezone.utc)
+    await write_audit_log(db, PASSWORD_RESET_CONFIRM, current_user.id, _source_ip(request), {"source": "profile"})
+    await db.flush()
+    return {"detail": "Password changed successfully."}
 
 
 @router.post("/password-reset/request")

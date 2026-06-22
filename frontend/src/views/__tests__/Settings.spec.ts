@@ -35,8 +35,12 @@ vi.mock('@/api/ledgers', () => ({
     ...payload,
   })),
   deleteLedger: vi.fn(),
-  getShareCode: vi.fn(),
-  listMembers: vi.fn(),
+  getShareCode: vi.fn(async () => 'share-code'),
+  listMembers: vi.fn(async () => []),
+  listShareRequests: vi.fn(async () => []),
+  approveShareRequest: vi.fn(),
+  rejectShareRequest: vi.fn(),
+  updateMemberRole: vi.fn(),
   removeMember: vi.fn(),
 }))
 
@@ -47,6 +51,7 @@ function makeRouter() {
       { path: '/ledgers', name: 'ledger-list', component: { template: '<div />' } },
       { path: '/ledgers/:id', name: 'ledger-detail', component: { template: '<div />' } },
       { path: '/ledgers/:id/settings', name: 'ledger-settings', component: Settings },
+      { path: '/ledgers/:id/members/:userId', name: 'share-member', component: { template: '<div />' } },
       { path: '/ledgers/:id/budget', name: 'budget-wizard', component: { template: '<div />' } },
       { path: '/ledgers/:id/recurring', name: 'ledger-recurring', component: { template: '<div />' } },
     ],

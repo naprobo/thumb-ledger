@@ -1,0 +1,20 @@
+{
+  "id": "/?lang=ja",
+  "name": "親指家計簿",
+  "short_name": "親指家計簿",
+  "description": "片手で素早く記録できる多言語家計簿アプリ。予算、共有家計簿、定期取引、通知に対応。",
+  "lang": "ja",
+  "start_url": "/?lang=ja",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

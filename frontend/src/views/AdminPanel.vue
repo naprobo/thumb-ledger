@@ -2,7 +2,10 @@
   <main class="page-shell">
     <header class="topbar">
       <h1>{{ t('admin.title') }}</h1>
-      <button type="button" @click="refresh">{{ t('common.refresh') }}</button>
+      <button type="button" class="refresh-button" :class="{ spinning: isRefreshing }" :disabled="isRefreshing" @click="refresh">
+        <RefreshCw :size="18" aria-hidden="true" />
+        <span>{{ t('common.refresh') }}</span>
+      </button>
     </header>
 
     <AppLoadingPanel v-if="isInitialLoading" class="admin-loading" />
@@ -113,6 +116,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { RefreshCw } from '@lucide/vue'
 
 import {
   deleteAdminUser,
@@ -133,6 +137,7 @@ const users = ref<AdminUser[]>([])
 const suggestions = ref<AdminSuggestion[]>([])
 const stats = ref<AdminStats | null>(null)
 const isInitialLoading = ref(true)
+const isRefreshing = ref(false)
 const errorMessage = ref('')
 const suggestionStatuses: SuggestionStatus[] = ['new', 'reviewing', 'planned', 'completed', 'declined']
 
@@ -140,6 +145,7 @@ onMounted(refresh)
 
 async function refresh() {
   errorMessage.value = ''
+  isRefreshing.value = true
   try {
     const [nextUsers, nextStats, nextSuggestions] = await Promise.all([
       listAdminUsers(),
@@ -153,6 +159,7 @@ async function refresh() {
     errorMessage.value = t('errors.forbidden')
   } finally {
     isInitialLoading.value = false
+    isRefreshing.value = false
   }
 }
 
@@ -262,6 +269,16 @@ select {
   padding: 0 10px;
 }
 
+.refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.refresh-button.spinning svg {
+  animation: spin-refresh 0.8s linear infinite;
+}
+
 .danger {
   border-color: #f3b8b3;
   color: #b42318;
@@ -298,6 +315,12 @@ select {
 
 .error {
   color: #b42318;
+}
+
+@keyframes spin-refresh {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 760px) {

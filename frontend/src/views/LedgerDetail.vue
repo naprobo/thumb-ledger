@@ -38,6 +38,7 @@
               <Plus :size="25" aria-hidden="true" />
             </v-btn>
             <v-btn
+              v-if="canManageLedger"
               class="icon-button"
               variant="outlined"
               icon
@@ -181,12 +182,14 @@ import { listTransactions, type Transaction, type TransactionListResponse } from
 import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import WizardFlow from '@/components/WizardFlow.vue'
 import { translateLabel } from '@/i18n/labels'
+import { useAuthStore } from '@/stores/auth'
 import { useLedgerStore } from '@/stores/ledgers'
 import { formatMoney } from '@/utils/money'
 
 const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const ledgerStore = useLedgerStore()
 const ledgerId = computed(() => String(route.params.id))
 const ledger = computed(() => ledgerStore.activeLedger)
@@ -207,6 +210,7 @@ const transactionList = ref<TransactionListResponse>({
 const currentMonthLabel = computed(() => formatMonthHeading(selectedMonth.value))
 const previousMonthLabel = computed(() => formatMonthButton(addMonths(selectedMonth.value, -1)))
 const nextMonthLabel = computed(() => formatMonthButton(addMonths(selectedMonth.value, 1)))
+const canManageLedger = computed(() => !authStore.user || ledger.value?.owner_id === authStore.user.id)
 const monthRange = computed(() => {
   const start = startOfMonth(selectedMonth.value)
   const end = new Date(start.getFullYear(), start.getMonth() + 1, 0)

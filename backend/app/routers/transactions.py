@@ -25,7 +25,7 @@ from app.schemas.transaction import (
 from app.services.auth import get_current_user
 from app.services.budget import budget_warning_after_transaction
 from app.services.image_storage import delete_stored_images, get_image_storage
-from app.services.ledger import get_ledger_or_404, require_read_ledger, require_write_ledger
+from app.services.ledger import add_notification, get_ledger_or_404, require_read_ledger, require_write_ledger
 from app.services.transaction import (
     build_transaction_items,
     clamp_page_size,
@@ -76,6 +76,20 @@ async def create_transaction(
     await db.flush()
     await update_preferences_for_transaction(db, ledger_id, current_user.id, transaction)
     transaction.budget_warning = await budget_warning_after_transaction(db, ledger)
+    if ledger.owner_id != current_user.id:
+        await add_notification(
+            db,
+            ledger.owner_id,
+            "LEDGER_TRANSACTION_CREATED",
+            {
+                "ledger_id": str(ledger.id),
+                "ledger_name": ledger.name,
+                "transaction_id": str(transaction.id),
+                "recorder_display_name": current_user.display_name,
+                "amount": str(transaction.amount),
+                "currency_code": transaction.currency_code,
+            },
+        )
     return transaction
 
 

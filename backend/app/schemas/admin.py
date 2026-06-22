@@ -3,6 +3,7 @@
 """
 import uuid
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -12,6 +13,8 @@ from app.schemas.suggestion import AdminSuggestionResponse, SuggestionStatusUpda
 class AdminUserResponse(BaseModel):
     id: uuid.UUID
     email: str
+    nickname: Optional[str] = None
+    display_name: str
     is_active: bool
     is_admin: bool
     created_at: datetime
