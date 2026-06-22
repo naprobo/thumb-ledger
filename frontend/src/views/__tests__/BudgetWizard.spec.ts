@@ -30,7 +30,7 @@ describe('BudgetWizard', () => {
 
     const wrapper = mount(BudgetWizard, { global: { plugins: [router] } })
 
-    expect(wrapper.find('input[inputmode="numeric"]').exists()).toBe(true)
+    await vi.waitFor(() => expect(wrapper.find('input[inputmode="numeric"]').exists()).toBe(true))
     await wrapper.find('input[inputmode="numeric"]').setValue('10000')
     await wrapper.find('form').trigger('submit')
     expect(wrapper.find('input[inputmode="numeric"]').exists()).toBe(true)

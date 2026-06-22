@@ -4,10 +4,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import LedgerList from '@/views/LedgerList.vue'
-import { useLedgerStore } from '@/stores/ledgers'
+
+const mockLedgers = vi.hoisted(() => [] as Array<Record<string, unknown>>)
 
 vi.mock('@/api/ledgers', () => ({
-  listLedgers: vi.fn(async () => []),
+  listLedgers: vi.fn(async () => mockLedgers),
   createLedger: vi.fn(),
 }))
 
@@ -26,6 +27,7 @@ function makeRouter() {
 describe('LedgerList', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    mockLedgers.splice(0, mockLedgers.length)
   })
 
   it('renders create wizard controls', async () => {
@@ -44,27 +46,25 @@ describe('LedgerList', () => {
     const router = makeRouter()
     router.push('/ledgers')
     await router.isReady()
-    const store = useLedgerStore()
-    store.ledgers = [
-      {
-        id: 'ledger-1',
-        owner_id: 'user-1',
-        name: 'Home',
-        entry_mode: 'receipt',
-        subject_enabled: false,
-        subject_step_mode: 'disabled',
-        necessity_step_mode: 'disabled',
-        default_currency_code: 'JPY',
-        timezone: 'Asia/Tokyo',
-        budget_enabled: false,
-        created_at: '',
-        updated_at: '',
-      },
-    ]
+    mockLedgers.push({
+      id: 'ledger-1',
+      owner_id: 'user-1',
+      name: 'Home',
+      entry_mode: 'receipt',
+      subject_enabled: false,
+      subject_step_mode: 'disabled',
+      necessity_step_mode: 'disabled',
+      default_currency_code: 'JPY',
+      timezone: 'Asia/Tokyo',
+      budget_enabled: false,
+      total_amounts: { JPY: 1200 },
+      created_at: '',
+      updated_at: '',
+    })
 
     const wrapper = mount(LedgerList, { global: { plugins: [router] } })
 
-    expect(wrapper.text()).toContain('Home')
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Home'))
     expect(wrapper.text()).toContain('¥')
     expect(wrapper.find('.settings-icon-button svg').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('设置')

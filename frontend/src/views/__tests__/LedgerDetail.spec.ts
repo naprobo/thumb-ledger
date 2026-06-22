@@ -147,12 +147,15 @@ describe('LedgerDetail', () => {
     await router.isReady()
 
     const wrapper = mountLedgerDetail(router)
+    expect(wrapper.find('.loading-panel').exists()).toBe(true)
     await vi.waitFor(() => expect(wrapper.text()).toContain('Home'))
 
     expect(wrapper.find('.topbar .record-button').exists()).toBe(true)
     expect(wrapper.find('.budget-panel.soft').exists()).toBe(true)
     expect(wrapper.text()).toContain('消费记录')
     expect(wrapper.text()).toContain('本月合计')
+    expect(wrapper.find('.section-heading .v-chip').exists()).toBe(false)
+    expect(wrapper.find('.month-title').exists()).toBe(false)
     expect(wrapper.text()).toContain('分类金额占比')
     expect(wrapper.text()).not.toContain('transaction.list')
     expect(wrapper.text()).not.toContain('transaction.monthTotal')

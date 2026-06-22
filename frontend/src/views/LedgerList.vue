@@ -104,7 +104,9 @@
       <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
     </section>
 
-    <section class="ledger-grid">
+    <AppLoadingPanel v-if="isInitialLoading" class="ledger-loading" />
+
+    <section v-else class="ledger-grid">
       <article v-for="ledger in ledgerStore.ledgers" :key="ledger.id" class="ledger-card">
         <button class="ledger-main" type="button" @click="router.push({ name: 'ledger-detail', params: { id: ledger.id } })">
           <strong>{{ ledger.name }}</strong>
@@ -137,6 +139,7 @@ import { Plus, Settings as SettingsIcon } from '@lucide/vue'
 
 import { useLedgerStore } from '@/stores/ledgers'
 import type { EntryMode, Ledger, LedgerCreatePayload } from '@/api/ledgers'
+import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { CURRENCY_OPTIONS, currencyOptionLabel } from '@/constants/currencies'
 import { formatMoneyWithTrailingSymbol } from '@/utils/money'
 
@@ -146,6 +149,7 @@ const ledgerStore = useLedgerStore()
 
 const showWizard = ref(false)
 const wizardStep = ref(0)
+const isInitialLoading = ref(true)
 const isSubmitting = ref(false)
 const errorMessage = ref('')
 const draft = reactive<LedgerCreatePayload>({
@@ -165,8 +169,12 @@ const canAdvance = computed(() => {
   return true
 })
 
-onMounted(() => {
-  ledgerStore.fetchLedgers()
+onMounted(async () => {
+  try {
+    await ledgerStore.fetchLedgers()
+  } finally {
+    isInitialLoading.value = false
+  }
 })
 
 function openWizard() {
@@ -329,6 +337,14 @@ button:disabled {
 .ledger-grid {
   display: grid;
   gap: 10px;
+}
+
+.ledger-loading {
+  min-height: 320px;
+  margin-top: 16px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .ledger-card {

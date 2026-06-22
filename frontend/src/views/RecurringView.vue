@@ -13,27 +13,52 @@
         </button>
         <div>
           <h1>{{ t('recurring.title') }}</h1>
-          <p v-if="ledger">{{ ledger.name }}</p>
         </div>
       </div>
-      <button type="button" @click="loadRecurring">{{ t('common.refresh') }}</button>
+      <div class="top-actions">
+        <button
+          type="button"
+          class="top-icon-button"
+          :aria-label="t('common.refresh')"
+          :title="t('common.refresh')"
+          @click="loadRecurring"
+        >
+          <RefreshCw :size="20" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="top-icon-button primary"
+          :aria-label="t('recurring.create')"
+          :title="t('recurring.create')"
+          @click="openCreateForm"
+        >
+          <Plus :size="22" aria-hidden="true" />
+        </button>
+      </div>
     </header>
 
     <div v-if="toastMessage" :class="['toast', toastKind]" role="status">
       {{ toastMessage }}
     </div>
 
-    <section class="section-block">
-      <div class="section-heading">
+    <AppLoadingPanel v-if="isInitialLoading" class="content-loading" />
+
+    <template v-else>
+    <section v-if="isFormOpen" class="section-block">
+      <div class="section-heading form-heading">
         <h2>{{ draft.editing_id ? t('recurring.edit') : t('recurring.create') }}</h2>
-        <button type="button" @click="isFormOpen = !isFormOpen">
-          <Plus v-if="!isFormOpen" :size="18" aria-hidden="true" />
-          <X v-else :size="18" aria-hidden="true" />
-          <span>{{ isFormOpen ? t('common.cancel') : t('recurring.create') }}</span>
+        <button
+          type="button"
+          class="close-form-button"
+          :aria-label="t('common.cancel')"
+          :title="t('common.cancel')"
+          @click="cancelForm"
+        >
+          <X :size="20" aria-hidden="true" />
         </button>
       </div>
 
-      <form v-if="isFormOpen" class="recurring-form" @submit.prevent="submitRecurring">
+      <form class="recurring-form" @submit.prevent="submitRecurring">
         <div class="grid-two">
           <label>
             <span>{{ t('transaction.amount') }} ({{ getCurrencySymbol(ledger?.default_currency_code || 'JPY') }})</span>
@@ -87,7 +112,6 @@
     <section class="section-block">
       <div class="section-heading">
         <h2>{{ t('recurring.templates') }}</h2>
-        <span>{{ templates.length }}</span>
       </div>
 
       <ul v-if="templates.length" class="template-list">
@@ -105,19 +129,41 @@
               · {{ t('recurring.nextRunDate') }} {{ template.next_run_date }}
             </p>
           </div>
-          <button type="button" @click="toggleRecurring(template)">
-            {{ template.is_active ? t('recurring.disable') : t('recurring.enable') }}
-          </button>
-          <button type="button" @click="startEdit(template)">
-            {{ t('recurring.edit') }}
-          </button>
-          <button type="button" class="danger-button" @click="deleteRecurring(template.id)">
-            {{ t('admin.delete') }}
-          </button>
+          <div class="template-actions">
+            <button
+              type="button"
+              class="icon-action"
+              :aria-label="template.is_active ? t('recurring.disable') : t('recurring.enable')"
+              :title="template.is_active ? t('recurring.disable') : t('recurring.enable')"
+              @click="toggleRecurring(template)"
+            >
+              <Pause v-if="template.is_active" :size="18" aria-hidden="true" />
+              <Play v-else :size="18" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="icon-action"
+              :aria-label="t('recurring.edit')"
+              :title="t('recurring.edit')"
+              @click="startEdit(template)"
+            >
+              <Pencil :size="18" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="icon-action danger-button"
+              :aria-label="t('admin.delete')"
+              :title="t('admin.delete')"
+              @click="deleteRecurring(template.id)"
+            >
+              <Trash2 :size="18" aria-hidden="true" />
+            </button>
+          </div>
         </li>
       </ul>
       <p v-else class="muted">{{ t('recurring.empty') }}</p>
     </section>
+    </template>
   </main>
 </template>
 
@@ -125,7 +171,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, Plus, X } from '@lucide/vue'
+import { ChevronLeft, Pause, Pencil, Play, Plus, RefreshCw, Trash2, X } from '@lucide/vue'
 
 import { listCategories, type Category } from '@/api/ledgers'
 import {
@@ -137,6 +183,7 @@ import {
   type RecurringTemplate,
 } from '@/api/recurring'
 import type { Necessity } from '@/api/transactions'
+import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { translateLabel } from '@/i18n/labels'
 import { useLedgerStore } from '@/stores/ledgers'
 import { formatMoney, getCurrencySymbol } from '@/utils/money'
@@ -150,6 +197,7 @@ const ledger = computed(() => ledgerStore.activeLedger)
 const categories = ref<Category[]>([])
 const templates = ref<RecurringTemplate[]>([])
 const isFormOpen = ref(false)
+const isInitialLoading = ref(true)
 const isSaving = ref(false)
 const toastMessage = ref('')
 const toastKind = ref<'success' | 'error'>('success')
@@ -168,8 +216,12 @@ const draft = reactive({
 const canSubmit = computed(() => draft.amount > 0 && !!draft.next_run_date && !!draft.category_name)
 
 onMounted(async () => {
-  await ledgerStore.fetchLedger(ledgerId.value)
-  await Promise.all([loadCategories(), loadRecurring()])
+  try {
+    await ledgerStore.fetchLedger(ledgerId.value)
+    await Promise.all([loadCategories(), loadRecurring()])
+  } finally {
+    isInitialLoading.value = false
+  }
 })
 
 watch(categories, (rows) => {
@@ -255,6 +307,16 @@ function resetDraft() {
   draft.necessity = 'essential'
 }
 
+function openCreateForm() {
+  resetDraft()
+  isFormOpen.value = true
+}
+
+function cancelForm() {
+  resetDraft()
+  isFormOpen.value = false
+}
+
 function startEdit(template: RecurringTemplate) {
   const item = template.template_data.items?.[0]
   draft.editing_id = template.id
@@ -305,6 +367,7 @@ function showToast(message: string, kind: 'success' | 'error') {
 
 .topbar,
 .title-row,
+.top-actions,
 .section-heading {
   display: flex;
   align-items: center;
@@ -315,6 +378,28 @@ function showToast(message: string, kind: 'success' | 'error') {
 .title-row {
   min-width: 0;
   justify-content: start;
+}
+
+.top-actions {
+  gap: 14px;
+}
+
+.top-icon-button {
+  display: inline-grid;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  place-items: center;
+  border-radius: 50%;
+  padding: 0;
+  color: #334155;
+}
+
+.top-icon-button.primary {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #fff;
 }
 
 .back-button {
@@ -348,6 +433,33 @@ h2 {
   border: 1px solid #d9dee7;
   border-radius: 8px;
   padding: 16px;
+  background: #fff;
+}
+
+.content-loading {
+  min-height: 320px;
+  margin-top: 16px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.form-heading {
+  align-items: center;
+}
+
+.form-heading h2 {
+  font-size: 1.22rem;
+  font-weight: 900;
+}
+
+.close-form-button {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border-radius: 50%;
+  padding: 0;
   background: #fff;
 }
 
@@ -415,11 +527,31 @@ button {
 
 .template-list li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   border-top: 1px solid #eef2f7;
   padding: 12px 0;
+}
+
+.template-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 40px);
+  gap: 6px;
+}
+
+.icon-action {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  border-radius: 50%;
+  padding: 0;
+  color: #334155;
+}
+
+.icon-action.danger-button {
+  color: #b42318;
 }
 
 .template-list p {
@@ -479,11 +611,30 @@ button {
 
 @media (max-width: 640px) {
   .topbar,
-  .section-heading,
   .template-list li {
     align-items: stretch;
     grid-template-columns: 1fr;
     flex-direction: column;
+  }
+
+  .section-heading {
+    align-items: center;
+  }
+
+  .form-heading {
+    flex-direction: row;
+  }
+
+  .template-actions {
+    grid-template-columns: repeat(3, 44px);
+    justify-content: end;
+  }
+
+  .icon-action {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
   }
 
   .title-row {
@@ -491,8 +642,13 @@ button {
     flex-direction: row;
   }
 
+  .topbar {
+    flex-direction: row;
+  }
+
   .grid-two {
     grid-template-columns: 1fr;
   }
+
 }
 </style>

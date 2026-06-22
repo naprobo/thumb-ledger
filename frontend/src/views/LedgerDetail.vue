@@ -67,18 +67,18 @@
         </v-card-text>
       </v-card>
 
-      <v-card class="list-panel" variant="outlined" rounded="lg">
+      <v-card class="list-panel" :class="{ loading: isInitialLoading }" variant="outlined" rounded="lg">
         <v-card-title class="section-heading">
           <span>{{ t('transaction.list') }} · {{ currentMonthLabel }}</span>
-          <v-chip size="small" variant="tonal">{{ transactionList.total }}</v-chip>
         </v-card-title>
 
         <v-card-text>
-          <v-expansion-panels v-if="transactionList.items.length" class="month-records" variant="accordion" :model-value="0">
+          <AppLoadingPanel v-if="isInitialLoading" />
+
+          <v-expansion-panels v-else-if="transactionList.items.length" v-model="monthSummaryPanel" class="month-records" variant="accordion">
             <v-expansion-panel class="month-panel" elevation="0" rounded="lg">
               <v-expansion-panel-title class="month-summary" hide-actions>
                 <div class="month-summary-main">
-                  <span class="month-title">{{ currentMonthLabel }}</span>
                   <span class="month-total-label">{{ t('transaction.monthTotal') }}</span>
                 </div>
                 <div class="month-total-values">
@@ -178,6 +178,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, Plus, Settings as SettingsIcon 
 import { getBudget, type Budget } from '@/api/budget'
 import type { Ledger } from '@/api/ledgers'
 import { listTransactions, type Transaction, type TransactionListResponse } from '@/api/transactions'
+import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import WizardFlow from '@/components/WizardFlow.vue'
 import { translateLabel } from '@/i18n/labels'
 import { useLedgerStore } from '@/stores/ledgers'
@@ -190,7 +191,9 @@ const ledgerStore = useLedgerStore()
 const ledgerId = computed(() => String(route.params.id))
 const ledger = computed(() => ledgerStore.activeLedger)
 const showWizard = ref(false)
+const isInitialLoading = ref(true)
 const selectedMonth = ref(startOfMonth(new Date()))
+const monthSummaryPanel = ref<number | undefined>(0)
 const pageSize = 1000
 const budget = ref<Budget | null>(null)
 const transactionList = ref<TransactionListResponse>({
@@ -271,8 +274,12 @@ const categoryChartSlices = computed(() => {
 const chartColors = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#64748b']
 
 onMounted(async () => {
-  await ledgerStore.fetchLedger(ledgerId.value)
-  await Promise.all([loadTransactions(), loadBudget()])
+  try {
+    await ledgerStore.fetchLedger(ledgerId.value)
+    await Promise.all([loadTransactions(), loadBudget()])
+  } finally {
+    isInitialLoading.value = false
+  }
 })
 
 async function loadTransactions() {
@@ -446,6 +453,10 @@ p {
   margin-top: 16px;
 }
 
+.list-panel.loading {
+  min-height: 320px;
+}
+
 .budget-panel.soft {
   border-color: #f59e0b;
 }
@@ -479,6 +490,10 @@ p {
   padding: 12px 14px 12px 18px;
 }
 
+.month-summary :deep(.v-expansion-panel-title__content) {
+  align-items: center;
+}
+
 .month-chevron {
   display: inline-grid;
   width: 36px;
@@ -507,15 +522,10 @@ p {
   align-content: center;
 }
 
-.month-title {
-  font-size: 1.05rem;
-  font-weight: 800;
-}
-
 .month-total-label {
   color: #607086;
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: 1rem;
+  font-weight: 800;
 }
 
 .month-total-values {
@@ -714,10 +724,6 @@ p {
 
   .chart-legend {
     width: 100%;
-  }
-
-  .month-summary {
-    align-items: start;
   }
 
   .month-total-values {

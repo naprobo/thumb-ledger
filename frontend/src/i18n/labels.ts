@@ -153,7 +153,8 @@ const LEGACY_LABEL_KEYS: Record<string, string> = {
 
 export function translateLabel(value: string | null | undefined, t: (key: string) => string): string {
   if (!value) return '-'
-  const key = LEGACY_LABEL_KEYS[value] || value
+  const normalizedValue = value.replace(/^(category|subject|item)\s+/, '$1.')
+  const key = LEGACY_LABEL_KEYS[value] || LEGACY_LABEL_KEYS[normalizedValue] || normalizedValue
   if (!/^(category|subject|item)\./.test(key)) return value
   const translated = t(key)
   return translated === key ? value : translated

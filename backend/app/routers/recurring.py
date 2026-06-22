@@ -13,7 +13,7 @@ from app.models.user import User
 from app.schemas.recurring import RecurringCreateRequest, RecurringResponse, RecurringUpdateRequest
 from app.services.auth import get_current_user
 from app.services.ledger import get_ledger_or_404, require_read_ledger, require_write_ledger
-from app.services.recurring import serialize_template_data
+from app.services.recurring import generate_due_recurring_for_template, serialize_template_data
 
 router = APIRouter(prefix="/ledgers/{ledger_id}/recurring", tags=["recurring"])
 
@@ -53,6 +53,9 @@ async def create_recurring(
     )
     db.add(recurring)
     await db.flush()
+    await generate_due_recurring_for_template(db, recurring, ledger)
+    await db.flush()
+    await db.refresh(recurring)
     return recurring
 
 
@@ -91,6 +94,8 @@ async def update_recurring(
         recurring.is_active = payload.is_active
     if payload.template_data is not None:
         recurring.template_data = serialize_template_data(payload.template_data)
+    await db.flush()
+    await generate_due_recurring_for_template(db, recurring, ledger)
     await db.flush()
     await db.refresh(recurring)
     return recurring

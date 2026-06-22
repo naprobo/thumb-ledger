@@ -116,6 +116,24 @@ async def generate_due_recurring_transactions(
     return generated
 
 
+async def generate_due_recurring_for_template(
+    db: AsyncSession,
+    recurring: RecurringTransaction,
+    ledger: Ledger,
+    now_utc: datetime | None = None,
+) -> int:
+    if not recurring.is_active:
+        return 0
+
+    today = ledger_today(ledger.timezone, now_utc)
+    generated = 0
+    while recurring.next_run_date <= today:
+        await create_transaction_from_recurring(db, recurring, ledger, recurring.next_run_date)
+        recurring.next_run_date = next_run_after(recurring.next_run_date, recurring.interval)
+        generated += 1
+    return generated
+
+
 async def run_recurring_generation_once() -> None:
     session_factory = get_session_factory()
     async with session_factory() as db:

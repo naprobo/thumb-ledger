@@ -51,7 +51,9 @@
         </button>
       </div>
 
-      <ul v-if="visibleSuggestions.length" class="suggestion-list">
+      <AppLoadingPanel v-if="isInitialLoading" class="list-loading" />
+
+      <ul v-else-if="visibleSuggestions.length" class="suggestion-list">
         <li v-for="suggestion in visibleSuggestions" :key="suggestion.id">
           <div>
             <strong>{{ suggestion.title }}</strong>
@@ -99,12 +101,14 @@ import {
   type SuggestionStatus,
   type SuggestionVoteType,
 } from '@/api/suggestions'
+import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 
 const { t } = useI18n()
 const router = useRouter()
 const activeTab = ref<'mine' | 'public'>('mine')
 const mySuggestions = ref<Suggestion[]>([])
 const publicSuggestions = ref<Suggestion[]>([])
+const isInitialLoading = ref(true)
 const isSubmitting = ref(false)
 const toastMessage = ref('')
 const toastKind = ref<'success' | 'error'>('success')
@@ -127,6 +131,8 @@ async function refresh() {
     publicSuggestions.value = publicRows
   } catch {
     showToast(t('errors.networkError'), 'error')
+  } finally {
+    isInitialLoading.value = false
   }
 }
 
@@ -224,6 +230,10 @@ p {
   border-radius: 8px;
   padding: 16px;
   background: #fff;
+}
+
+.list-loading {
+  min-height: 260px;
 }
 
 .toast {

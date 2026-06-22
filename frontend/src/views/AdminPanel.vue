@@ -5,6 +5,9 @@
       <button type="button" @click="refresh">{{ t('common.refresh') }}</button>
     </header>
 
+    <AppLoadingPanel v-if="isInitialLoading" class="admin-loading" />
+
+    <template v-else>
     <section class="stats-grid">
       <article>
         <span>{{ t('admin.totalUsers') }}</span>
@@ -101,6 +104,7 @@
       </table>
       <p v-else class="muted">-</p>
     </section>
+    </template>
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
   </main>
@@ -122,11 +126,13 @@ import {
   type AdminUser,
 } from '@/api/admin'
 import type { SuggestionStatus } from '@/api/suggestions'
+import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 
 const { t } = useI18n()
 const users = ref<AdminUser[]>([])
 const suggestions = ref<AdminSuggestion[]>([])
 const stats = ref<AdminStats | null>(null)
+const isInitialLoading = ref(true)
 const errorMessage = ref('')
 const suggestionStatuses: SuggestionStatus[] = ['new', 'reviewing', 'planned', 'completed', 'declined']
 
@@ -145,6 +151,8 @@ async function refresh() {
     suggestions.value = nextSuggestions
   } catch {
     errorMessage.value = t('errors.forbidden')
+  } finally {
+    isInitialLoading.value = false
   }
 }
 
@@ -194,6 +202,14 @@ function formatDate(value: string): string {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.admin-loading {
+  min-height: 360px;
+  margin-top: 16px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .stats-grid article,
