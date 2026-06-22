@@ -18,7 +18,9 @@
       </div>
     </header>
 
-    <form class="budget-form" @submit.prevent="nextOrSave">
+    <AppLoadingPanel v-if="isInitialLoading" class="budget-loading" />
+
+    <form v-else class="budget-form" @submit.prevent="nextOrSave">
       <section v-if="step === 0">
         <h2>{{ t('budget.monthly') }}</h2>
         <input v-model.number="monthlyTotal" inputmode="numeric" min="1" type="number" required />
@@ -71,6 +73,7 @@ import { ChevronLeft } from '@lucide/vue'
 
 import { saveBudget } from '@/api/budget'
 import { listCategories, type Category } from '@/api/ledgers'
+import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { translateLabel } from '@/i18n/labels'
 
 const { t } = useI18n()
@@ -83,6 +86,7 @@ const annualTotal = ref<number | null>(null)
 const splitByCategory = ref(false)
 const categories = ref<Category[]>([])
 const categoryAmounts = reactive<Record<string, number>>({})
+const isInitialLoading = ref(true)
 const isSaving = ref(false)
 const statusMessage = ref('')
 const errorMessage = ref('')
@@ -94,8 +98,12 @@ const canContinue = computed(() => {
 })
 
 onMounted(async () => {
-  categories.value = await listCategories(ledgerId.value)
-  applyDefaultCategoryAmounts()
+  try {
+    categories.value = await listCategories(ledgerId.value)
+    applyDefaultCategoryAmounts()
+  } finally {
+    isInitialLoading.value = false
+  }
 })
 
 function applyDefaultCategoryAmounts() {
@@ -212,6 +220,14 @@ async function skipBudget() {
   border: 1px solid #d9dee7;
   border-radius: 8px;
   padding: 16px;
+  background: #fff;
+}
+
+.budget-loading {
+  min-height: 320px;
+  margin-top: 20px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
   background: #fff;
 }
 

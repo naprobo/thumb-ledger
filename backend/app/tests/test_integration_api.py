@@ -418,7 +418,7 @@ async def test_recurring_generation_creates_transaction_from_template(
         headers=auth_headers(token),
         json={
             "interval": "monthly",
-            "next_run_date": "2026-06-01",
+            "next_run_date": "2026-07-01",
             "template_data": {
                 "amount": 777,
                 "currency_code": "JPY",
@@ -433,7 +433,7 @@ async def test_recurring_generation_creates_transaction_from_template(
 
     generated = await generate_due_recurring_transactions(
         db_session,
-        now_utc=datetime(2026, 6, 12, tzinfo=timezone.utc),
+        now_utc=datetime(2026, 7, 12, tzinfo=timezone.utc),
     )
     assert generated >= 1
 
@@ -441,7 +441,7 @@ async def test_recurring_generation_creates_transaction_from_template(
         select(RecurringTransaction).where(RecurringTransaction.id == uuid.UUID(recurring_response.json()["id"]))
     )
     assert recurring is not None
-    assert recurring.next_run_date == date(2026, 7, 1)
+    assert recurring.next_run_date == date(2026, 8, 1)
 
     transaction = await db_session.scalar(
         select(Transaction).where(Transaction.recurring_transaction_id == recurring.id)
@@ -449,9 +449,54 @@ async def test_recurring_generation_creates_transaction_from_template(
     assert transaction is not None
     assert transaction.amount == 777
     assert transaction.currency_code == "JPY"
-    assert transaction.transaction_date == date(2026, 6, 1)
+    assert transaction.transaction_date == date(2026, 7, 1)
     assert transaction.necessity == "non-essential"
     assert transaction.note == "monthly template"
+
+
+@pytest.mark.asyncio
+async def test_recurring_template_due_today_is_generated_immediately(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services import recurring as recurring_service
+
+    monkeypatch.setattr(recurring_service, "ledger_today", lambda _timezone, _now_utc=None: date(2026, 6, 12))
+
+    email = unique_email("recurring-immediate")
+    await register_user(client, email)
+    token = await login_user(client, email)
+    ledger = await create_ledger(client, token, name="Recurring Immediate Ledger")
+    ledger_id = ledger["id"]
+
+    recurring_response = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger_id}/recurring",
+        headers=auth_headers(token),
+        json={
+            "interval": "monthly",
+            "next_run_date": "2026-06-01",
+            "template_data": {
+                "amount": 1880,
+                "currency_code": "JPY",
+                "necessity": "essential",
+                "note": "due immediately",
+                "items": [],
+                "subject_ids": [],
+            },
+        },
+    )
+    assert recurring_response.status_code == 201, recurring_response.text
+    assert recurring_response.json()["next_run_date"] == "2026-07-01"
+
+    recurring_id = uuid.UUID(recurring_response.json()["id"])
+    transaction = await db_session.scalar(
+        select(Transaction).where(Transaction.recurring_transaction_id == recurring_id)
+    )
+    assert transaction is not None
+    assert transaction.amount == 1880
+    assert transaction.transaction_date == date(2026, 6, 1)
+    assert transaction.note == "due immediately"
 
 
 @pytest.mark.asyncio

@@ -4,6 +4,7 @@ set -Eeuo pipefail
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 BRANCH="${BRANCH:-}"
 SERVICES=(backend frontend)
+export DOCKER_BUILDKIT=1
 
 cd "$(dirname "$0")"
 

@@ -117,7 +117,7 @@ describe('RecurringView', () => {
     const wrapper = mount(RecurringView, { global: { plugins: [router] } })
     await vi.waitFor(() => expect(wrapper.text()).toContain('家賃'))
 
-    await wrapper.find('.section-heading button').trigger('click')
+    await wrapper.find('.top-icon-button.primary').trigger('click')
     await wrapper.find('input[type="number"]').setValue('1200')
     await wrapper.find('input[type="date"]').setValue('2026-07-10')
     await wrapper.findAll('select')[0].setValue('weekly')
@@ -138,10 +138,10 @@ describe('RecurringView', () => {
       },
     })
 
-    await wrapper.findAll('.template-list button').find((button) => button.text() === '停用')?.trigger('click')
+    await wrapper.find('.template-list button[aria-label="停用"]').trigger('click')
     await vi.waitFor(() => expect(updateRecurringTemplate).toHaveBeenCalledWith('ledger-1', 'recurring-1', { is_active: false }))
 
-    await wrapper.findAll('.template-list button').find((button) => button.text() === '启用')?.trigger('click')
+    await wrapper.find('.template-list button[aria-label="启用"]').trigger('click')
     await vi.waitFor(() => expect(updateRecurringTemplate).toHaveBeenCalledWith('ledger-1', 'recurring-1', { is_active: true }))
 
     await wrapper.find('.danger-button').trigger('click')
@@ -155,7 +155,7 @@ describe('RecurringView', () => {
     const wrapper = mount(RecurringView, { global: { plugins: [router] } })
     await vi.waitFor(() => expect(wrapper.text()).toContain('家賃'))
 
-    await wrapper.findAll('.template-list button').find((button) => button.text() === '编辑')?.trigger('click')
+    await wrapper.find('.template-list button[aria-label="编辑"]').trigger('click')
     await wrapper.find('input[type="number"]').setValue('60000')
     await wrapper.findAll('select')[0].setValue('yearly')
     await wrapper.find('form').trigger('submit')

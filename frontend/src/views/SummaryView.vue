@@ -22,7 +22,9 @@
 
     <p v-if="errorMessage" class="error">{{ errorMessage }}</p>
 
-    <section class="summary-grid">
+    <AppLoadingPanel v-if="isInitialLoading" class="summary-loading" />
+
+    <section v-else class="summary-grid">
       <SummaryGroupList :title="t('summary.byCategory')" :items="displaySummary.categories" />
       <SummaryGroupList :title="t('summary.bySubject')" :items="displaySummary.subjects" />
       <SummaryGroupList :title="t('summary.byNecessity')" :items="displaySummary.necessities" />
@@ -36,6 +38,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 
 import { getLedgerSummary, type LedgerSummary, type SummaryGroup } from '@/api/transactions'
+import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { translateLabel } from '@/i18n/labels'
 import { formatMoney } from '@/utils/money'
 
@@ -72,6 +75,7 @@ const ledgerId = computed(() => String(route.params.id))
 const timeRange = ref<TimeRange>('month')
 const startDate = ref('')
 const endDate = ref('')
+const isInitialLoading = ref(true)
 const errorMessage = ref('')
 const summary = ref<LedgerSummary>({ categories: [], subjects: [], necessities: [] })
 const displaySummary = computed<LedgerSummary>(() => ({
@@ -106,6 +110,8 @@ async function loadSummary() {
     })
   } catch {
     errorMessage.value = t('errors.invalidDateRange')
+  } finally {
+    isInitialLoading.value = false
   }
 }
 </script>
@@ -167,6 +173,13 @@ input {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+}
+
+.summary-loading {
+  min-height: 280px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #fff;
 }
 
 :deep(.summary-card) {

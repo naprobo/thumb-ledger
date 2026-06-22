@@ -16,7 +16,9 @@
       </div>
     </header>
 
-    <v-card v-if="transaction" class="detail-card" variant="outlined" rounded="lg">
+    <AppLoadingPanel v-if="isInitialLoading" class="detail-loading" />
+
+    <v-card v-else-if="transaction" class="detail-card" variant="outlined" rounded="lg">
       <v-card-text>
         <div class="amount-line">
           <strong>{{ formatMoney(transaction.amount, transaction.currency_code) }}</strong>
@@ -153,6 +155,7 @@ import { ChevronLeft } from '@lucide/vue'
 import { listCategories, type Category } from '@/api/ledgers'
 import { deleteTransaction, getTransaction, updateTransaction, type Necessity, type Transaction } from '@/api/transactions'
 import { listSubjects, type Subject } from '@/api/preferences'
+import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { translateLabel } from '@/i18n/labels'
 import { useLedgerStore } from '@/stores/ledgers'
 import { formatMoney, formatMoneyInputValue, parseMoneyInputValue } from '@/utils/money'
@@ -168,6 +171,7 @@ const transaction = ref<Transaction | null>(null)
 const categories = ref<Category[]>([])
 const subjects = ref<Subject[]>([])
 const isEditing = ref(false)
+const isInitialLoading = ref(true)
 const isSaving = ref(false)
 const isDeleting = ref(false)
 const errorMessage = ref('')
@@ -201,15 +205,19 @@ const subjectLabels = computed(() => {
 })
 
 onMounted(async () => {
-  await ledgerStore.fetchLedger(ledgerId.value)
-  const [loadedTransaction, loadedCategories, loadedSubjects] = await Promise.all([
-    getTransaction(ledgerId.value, transactionId.value),
-    listCategories(ledgerId.value),
-    listSubjects(ledgerId.value),
-  ])
-  transaction.value = loadedTransaction
-  categories.value = loadedCategories
-  subjects.value = loadedSubjects
+  try {
+    await ledgerStore.fetchLedger(ledgerId.value)
+    const [loadedTransaction, loadedCategories, loadedSubjects] = await Promise.all([
+      getTransaction(ledgerId.value, transactionId.value),
+      listCategories(ledgerId.value),
+      listSubjects(ledgerId.value),
+    ])
+    transaction.value = loadedTransaction
+    categories.value = loadedCategories
+    subjects.value = loadedSubjects
+  } finally {
+    isInitialLoading.value = false
+  }
 })
 
 function startEdit() {
@@ -321,8 +329,16 @@ h2 {
 }
 
 .detail-card,
-.edit-card {
+.edit-card,
+.detail-loading {
   margin-top: 16px;
+}
+
+.detail-loading {
+  min-height: 320px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
+  background: #fff;
 }
 
 .amount-line {

@@ -19,6 +19,9 @@
       {{ toastMessage }}
     </div>
 
+    <AppLoadingPanel v-if="isInitialLoading" class="content-loading" />
+
+    <template v-else>
     <section v-if="ledger" class="section-block">
       <form class="settings-form" @submit.prevent="saveSettings">
         <div class="settings-grid">
@@ -100,6 +103,7 @@
       <h2>{{ t('settings.dangerZone') }}</h2>
       <button type="button" @click="showDeleteConfirm = true">{{ t('ledger.delete') }}</button>
     </section>
+    </template>
 
     <div v-if="showDeleteConfirm" class="modal-backdrop" role="presentation" @click.self="showDeleteConfirm = false">
       <section class="confirm-dialog" role="dialog" aria-modal="true" :aria-label="t('ledger.delete')">
@@ -122,6 +126,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft } from '@lucide/vue'
 
 import { getShareCode, listMembers, removeMember, type LedgerMember, type NecessityStepMode, type SubjectStepMode } from '@/api/ledgers'
+import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { CURRENCY_OPTIONS, currencyOptionLabel } from '@/constants/currencies'
 import { useLedgerStore } from '@/stores/ledgers'
 
@@ -141,6 +146,7 @@ const draft = reactive<{ name: string; subject_step_mode: SubjectStepMode; neces
 const members = ref<LedgerMember[]>([])
 const shareCode = ref('')
 const shareError = ref('')
+const isInitialLoading = ref(true)
 const isSaving = ref(false)
 const toastMessage = ref('')
 const toastKind = ref<'success' | 'error'>('success')
@@ -148,11 +154,15 @@ const showDeleteConfirm = ref(false)
 let toastTimer: number | undefined
 
 onMounted(async () => {
-  const loaded = await ledgerStore.fetchLedger(ledgerId.value)
-  draft.name = loaded.name
-  draft.subject_step_mode = loaded.subject_step_mode
-  draft.necessity_step_mode = loaded.necessity_step_mode
-  draft.default_currency_code = loaded.default_currency_code
+  try {
+    const loaded = await ledgerStore.fetchLedger(ledgerId.value)
+    draft.name = loaded.name
+    draft.subject_step_mode = loaded.subject_step_mode
+    draft.necessity_step_mode = loaded.necessity_step_mode
+    draft.default_currency_code = loaded.default_currency_code
+  } finally {
+    isInitialLoading.value = false
+  }
 })
 
 async function saveSettings() {
@@ -299,6 +309,14 @@ h2 {
   border: 1px solid #d9dee7;
   border-radius: 8px;
   padding: 14px;
+  background: #fff;
+}
+
+.content-loading {
+  min-height: 320px;
+  margin-top: 12px;
+  border: 1px solid #d9dee7;
+  border-radius: 8px;
   background: #fff;
 }
 
