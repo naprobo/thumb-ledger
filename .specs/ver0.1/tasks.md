@@ -493,47 +493,47 @@
     - 前端 Vitest：建议提交、我的建议/公开建议 tab、支持/反对按钮、Admin 建议管理
     - _Requirements: 27.1 - 27.12_
 
-- [ ] 28. 账本共享、个人信息与通知中心完善
-  - [ ] 28.1 扩展用户资料模型与认证 API
+- [x] 28. 账本共享、个人信息与通知中心完善
+  - [x] 28.1 扩展用户资料模型与认证 API
     - User 增加 `nickname` 字段，注册时可选输入 nickname
     - `GET /auth/me` 返回 nickname 与 display_name
     - `PATCH /auth/me/profile` 支持创建、更新、清空 nickname，并继续支持语言偏好持久化
     - `POST /auth/me/change-password` 支持登录用户输入当前密码后修改密码，并使旧 JWT 失效
     - _Requirements: 1.1a, 1c.1, 1c.2, 1c.3, 1c.4, 1c.5, 1c.6, 14.4_
 
-  - [ ] 28.2 完善共享 API 响应与成员权限变更
+  - [x] 28.2 完善共享 API 响应与成员权限变更
     - Share_Request、LedgerMember 响应包含用户 email、nickname、display_name
     - 新增或补齐 `PATCH /ledgers/{id}/members/{user_id}`，Owner 可修改成员 role
     - 移除/停止共享时生成 Notification，并保持只读/可写权限立即生效
     - _Requirements: 9.3, 9.5, 9.6, 9.12, 9.13, 9.14, 9.15, 9.16_
 
-  - [ ] 28.3 实现通知 API
+  - [x] 28.3 实现通知 API
     - `GET /notifications`、`GET /notifications/unread-count`
     - `POST /notifications/{id}/read`、`POST /notifications/read-all`
     - 共享申请、批准、拒绝、权限变更、移除成员均生成通知
     - _Requirements: 28.1, 28.2, 28.3, 28.4, 28.5, 28.6, 28.7, 28.8, 28.9_
 
-  - [ ] 28.4 实现前端个人信息页面
+  - [x] 28.4 实现前端个人信息页面
     - 右上角汉堡菜单新增“个人信息”入口
     - `ProfileView.vue` 显示 email，编辑 nickname，修改密码
     - 将账号注销入口放在危险操作区域
     - _Requirements: 1c.1, 1c.2, 1c.3, 1c.5, 1c.7_
 
-  - [ ] 28.5 实现前端通知铃铛与通知列表
+  - [x] 28.5 实现前端通知铃铛与通知列表
     - 汉堡菜单左侧显示 bell icon
     - 未读通知显示红点
     - 点击进入通知列表或抽屉，可标记单条/全部已读
     - 通知文案使用 i18n，用户名显示 nickname fallback email
     - _Requirements: 28.1 - 28.9_
 
-  - [ ] 28.6 完善前端账本共享流程
+  - [x] 28.6 完善前端账本共享流程
     - 设置页分享码显示框右侧增加 copy icon，并使用顶栏下方居中 toast 提示复制结果
     - 右上角菜单新增“加入共享账本”入口，输入分享码提交申请
     - 设置页 Owner 可查看待审批申请，批准/拒绝，并选择 read-only / read-write
     - 成员列表显示 nickname fallback email；点击成员进入详情页，可修改权限或停止共享
     - _Requirements: 9.1 - 9.16_
 
-  - [ ] 28.7 增加共享/通知/个人信息测试
+  - [x] 28.7 增加共享/通知/个人信息测试
     - 后端属性测试：通知未读计数一致性（Property 30）、共享成员权限变更生效（Property 31）
     - 后端集成测试：申请加入 → Owner 收通知 → 批准/拒绝 → 申请人收通知 → 标记已读
     - 前端 Vitest：ProfileView、NotificationBell、NotificationsView、ShareJoinView、ShareMemberView、Settings 共享区
