@@ -4,14 +4,31 @@
       <button type="button" class="brand-button" @click="router.push({ name: 'ledger-list' })">
         {{ t('app.title') }}
       </button>
-      <details ref="menuRef" class="user-menu">
-        <summary :aria-label="menuLabel" :title="menuLabel">
-          <Menu :size="22" aria-hidden="true" />
-        </summary>
+      <div class="header-actions">
+        <button
+          type="button"
+          class="icon-button notification-button"
+          :aria-label="t('notifications.title')"
+          :title="t('notifications.title')"
+          @click="router.push({ name: 'notifications' })"
+        >
+          <Bell :size="21" aria-hidden="true" />
+          <span v-if="unreadCount > 0" class="unread-dot" aria-hidden="true" />
+        </button>
+        <details ref="menuRef" class="user-menu">
+          <summary :aria-label="menuLabel" :title="menuLabel">
+            <Menu :size="22" aria-hidden="true" />
+          </summary>
         <div class="menu-panel">
-          <p>{{ authStore.user?.email }}</p>
+          <p>{{ authStore.user?.display_name || authStore.user?.email }}</p>
           <button type="button" @click="goTo('ledger-list')">
             {{ t('nav.ledgers') }}
+          </button>
+          <button type="button" @click="goTo('profile')">
+            {{ t('nav.profile') }}
+          </button>
+          <button type="button" @click="goTo('share-join')">
+            {{ t('nav.joinShare') }}
           </button>
           <button type="button" @click="goTo('suggestions')">
             {{ t('nav.suggestions') }}
@@ -35,30 +52,50 @@
             {{ t('nav.logout') }}
           </button>
         </div>
-      </details>
+        </details>
+      </div>
     </header>
     <router-view />
   </v-app>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, type RouteRecordName } from 'vue-router'
-import { Menu } from '@lucide/vue'
+import { Bell, Menu } from '@lucide/vue'
 
 import { useAuthStore } from '@/stores/auth'
 import { SUPPORTED_LOCALES, type SupportedLocale } from '@/i18n'
+import { getUnreadNotificationCount } from '@/api/notifications'
 
 const authStore = useAuthStore()
 const router = useRouter()
 const { t, locale } = useI18n()
 const menuRef = ref<HTMLDetailsElement | null>(null)
+const unreadCount = ref(0)
 const menuLabel = computed(() => authStore.user?.email?.slice(0, 1).toUpperCase() || 'Menu')
 const localeOptions: Array<{ value: SupportedLocale; label: string }> = SUPPORTED_LOCALES.map((value) => ({
   value,
   label: value === 'zh-CN' ? '简体中文' : value === 'ja' ? '日本語' : 'English',
 }))
+const localizedSiteMeta: Record<SupportedLocale, { title: string; manifest: string; description: string }> = {
+  'zh-CN': {
+    title: '拇指账本',
+    manifest: '/manifest.zh-CN.webmanifest',
+    description: '拇指账本是面向手机单手操作的多语言记账应用，支持预算、共享账本、周期性消费和通知。',
+  },
+  ja: {
+    title: '親指家計簿',
+    manifest: '/manifest.ja.webmanifest',
+    description: '親指家計簿は片手で素早く記録できる多言語家計簿アプリです。予算、共有家計簿、定期取引、通知に対応します。',
+  },
+  en: {
+    title: 'Thumb Ledger',
+    manifest: '/manifest.en.webmanifest',
+    description: 'Thumb Ledger is a mobile-first multilingual bookkeeping app for fast expense entry, budgets, shared ledgers, recurring expenses, and notifications.',
+  },
+}
 
 async function changeLanguage(event: Event) {
   const nextLocale = (event.target as HTMLSelectElement).value as SupportedLocale
@@ -88,13 +125,54 @@ function logout() {
   router.push({ name: 'login' })
 }
 
+async function refreshUnreadCount() {
+  if (!authStore.isAuthenticated) {
+    unreadCount.value = 0
+    return
+  }
+  try {
+    unreadCount.value = await getUnreadNotificationCount()
+  } catch {
+    unreadCount.value = 0
+  }
+}
+
 onMounted(() => {
   document.addEventListener('pointerdown', handleDocumentPointerDown)
+  refreshUnreadCount()
+  syncSiteMeta(locale.value as SupportedLocale)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
 })
+
+watch(
+  () => router.currentRoute.value.fullPath,
+  () => refreshUnreadCount(),
+)
+
+watch(
+  () => locale.value,
+  (value) => syncSiteMeta(value as SupportedLocale),
+  { immediate: true },
+)
+
+function syncSiteMeta(value: SupportedLocale) {
+  const meta = localizedSiteMeta[value] || localizedSiteMeta['zh-CN']
+  document.documentElement.lang = value
+  document.title = meta.title
+  setMetaContent('application-name', meta.title)
+  setMetaContent('apple-mobile-web-app-title', meta.title)
+  setMetaContent('description', meta.description)
+  const manifest = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
+  if (manifest) manifest.href = meta.manifest
+}
+
+function setMetaContent(name: string, content: string) {
+  const element = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)
+  if (element) element.content = content
+}
 </script>
 
 <style scoped>
@@ -111,7 +189,14 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .brand-button,
+.icon-button,
 .user-menu summary,
 .menu-panel button,
 .language-select select {
@@ -128,13 +213,32 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
+.icon-button,
 .user-menu summary {
   display: grid;
   place-items: center;
   width: 40px;
+  min-width: 40px;
+  height: 40px;
   border: 1px solid #c9d1dc;
   border-radius: 50%;
   list-style: none;
+}
+
+.notification-button {
+  position: relative;
+  padding: 0;
+}
+
+.unread-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #dc2626;
 }
 
 .user-menu summary::-webkit-details-marker {
@@ -146,7 +250,8 @@ onBeforeUnmount(() => {
   top: 48px;
   right: 0;
   display: grid;
-  min-width: 220px;
+  width: 240px;
+  max-width: calc(100vw - 24px);
   gap: 4px;
   border: 1px solid #d9dee7;
   border-radius: 8px;
@@ -176,10 +281,11 @@ onBeforeUnmount(() => {
 }
 
 .language-select select {
+  box-sizing: border-box;
   width: 100%;
   border: 1px solid #c9d1dc;
   border-radius: 6px;
-  padding: 0 8px;
+  padding: 0 32px 0 10px;
   font-weight: 700;
 }
 

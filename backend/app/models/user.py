@@ -35,6 +35,10 @@ class User(Base):
         nullable=False,
         index=True,
     )
+    nickname: Mapped[Optional[str]] = mapped_column(
+        String(50),
+        nullable=True,
+    )
     password_hash: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
@@ -106,6 +110,10 @@ class User(Base):
         "AuditLog",
         back_populates="user",
     )
+
+    @property
+    def display_name(self) -> str:
+        return self.nickname or self.email
     notifications: Mapped[List["Notification"]] = relationship(
         "Notification",
         back_populates="user",

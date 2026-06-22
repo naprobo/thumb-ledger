@@ -128,7 +128,12 @@ async def add_notification(
     notification_type: str,
     payload: dict | None = None,
 ) -> Notification:
-    notification = Notification(user_id=user_id, type=notification_type, payload=payload)
+    notification = Notification(
+        user_id=user_id,
+        type=notification_type,
+        payload=payload,
+        created_at=datetime.now(timezone.utc),
+    )
     db.add(notification)
     await db.flush()
     return notification

@@ -16,7 +16,10 @@
       <div v-if="timeRange === 'custom'" class="date-grid">
         <input v-model="startDate" type="date" />
         <input v-model="endDate" type="date" />
-        <button type="button" @click="loadSummary">{{ t('common.refresh') }}</button>
+        <button type="button" class="refresh-button" :class="{ spinning: isRefreshing }" :disabled="isRefreshing" @click="loadSummary">
+          <RefreshCw :size="18" aria-hidden="true" />
+          <span>{{ t('common.refresh') }}</span>
+        </button>
       </div>
     </section>
 
@@ -36,6 +39,7 @@
 import { defineComponent, h, onMounted, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { RefreshCw } from '@lucide/vue'
 
 import { getLedgerSummary, type LedgerSummary, type SummaryGroup } from '@/api/transactions'
 import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
@@ -76,6 +80,7 @@ const timeRange = ref<TimeRange>('month')
 const startDate = ref('')
 const endDate = ref('')
 const isInitialLoading = ref(true)
+const isRefreshing = ref(false)
 const errorMessage = ref('')
 const summary = ref<LedgerSummary>({ categories: [], subjects: [], necessities: [] })
 const displaySummary = computed<LedgerSummary>(() => ({
@@ -102,6 +107,7 @@ async function selectRange(range: TimeRange) {
 
 async function loadSummary() {
   errorMessage.value = ''
+  isRefreshing.value = true
   try {
     summary.value = await getLedgerSummary(ledgerId.value, {
       time_range: timeRange.value,
@@ -112,6 +118,7 @@ async function loadSummary() {
     errorMessage.value = t('errors.invalidDateRange')
   } finally {
     isInitialLoading.value = false
+    isRefreshing.value = false
   }
 }
 </script>
@@ -143,6 +150,16 @@ button {
   border: 1px solid #c9d1dc;
   background: #fff;
   padding: 0 14px;
+}
+
+.refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.refresh-button.spinning svg {
+  animation: spin-refresh 0.8s linear infinite;
 }
 
 input {
@@ -202,6 +219,12 @@ input {
 
 .error {
   color: #b42318;
+}
+
+@keyframes spin-refresh {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 760px) {

@@ -114,6 +114,7 @@
         </button>
         <span class="ledger-total">{{ ledgerTotalLabel(ledger) }}</span>
         <button
+          v-if="canManageLedger(ledger)"
           type="button"
           class="settings-icon-button"
           :aria-label="t('nav.settings')"
@@ -141,10 +142,12 @@ import { useLedgerStore } from '@/stores/ledgers'
 import type { EntryMode, Ledger, LedgerCreatePayload } from '@/api/ledgers'
 import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { CURRENCY_OPTIONS, currencyOptionLabel } from '@/constants/currencies'
+import { useAuthStore } from '@/stores/auth'
 import { formatMoneyWithTrailingSymbol } from '@/utils/money'
 
 const { t } = useI18n()
 const router = useRouter()
+const authStore = useAuthStore()
 const ledgerStore = useLedgerStore()
 
 const showWizard = ref(false)
@@ -195,6 +198,10 @@ function ledgerTotalLabel(ledger: Ledger): string {
   const totals = Object.entries(ledger.total_amounts || {})
   if (!totals.length) return `${t('summary.total')} ${formatMoneyWithTrailingSymbol(0, ledger.default_currency_code)}`
   return `${t('summary.total')} ${totals.map(([currency, amount]) => formatMoneyWithTrailingSymbol(amount, currency)).join(' / ')}`
+}
+
+function canManageLedger(ledger: Ledger): boolean {
+  return !authStore.user || ledger.owner_id === authStore.user.id
 }
 
 async function submitLedger() {

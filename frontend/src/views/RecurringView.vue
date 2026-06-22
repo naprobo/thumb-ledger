@@ -19,6 +19,8 @@
         <button
           type="button"
           class="top-icon-button"
+          :class="{ spinning: isRefreshing }"
+          :disabled="isRefreshing"
           :aria-label="t('common.refresh')"
           :title="t('common.refresh')"
           @click="loadRecurring"
@@ -198,6 +200,7 @@ const categories = ref<Category[]>([])
 const templates = ref<RecurringTemplate[]>([])
 const isFormOpen = ref(false)
 const isInitialLoading = ref(true)
+const isRefreshing = ref(false)
 const isSaving = ref(false)
 const toastMessage = ref('')
 const toastKind = ref<'success' | 'error'>('success')
@@ -236,7 +239,12 @@ async function loadCategories() {
 }
 
 async function loadRecurring() {
-  templates.value = await listRecurringTemplates(ledgerId.value)
+  isRefreshing.value = true
+  try {
+    templates.value = await listRecurringTemplates(ledgerId.value)
+  } finally {
+    isRefreshing.value = false
+  }
 }
 
 async function submitRecurring() {
@@ -400,6 +408,16 @@ function showToast(message: string, kind: 'success' | 'error') {
   border-color: #2563eb;
   background: #2563eb;
   color: #fff;
+}
+
+.top-icon-button.spinning svg {
+  animation: spin-refresh 0.8s linear infinite;
+}
+
+@keyframes spin-refresh {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .back-button {

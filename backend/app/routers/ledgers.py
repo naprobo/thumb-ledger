@@ -19,6 +19,7 @@ from app.schemas.ledger import (
     LedgerResponse,
     LedgerUpdateRequest,
     MemberResponse,
+    MemberRoleUpdateRequest,
     ShareCodeResponse,
     ShareRequestCreateRequest,
     ShareRequestResponse,
@@ -57,6 +58,38 @@ router = APIRouter(prefix="/ledgers", tags=["ledgers"])
 
 def _source_ip(request: Request) -> str | None:
     return request.client.host if request.client else None
+
+
+def _display_name(user: User | None) -> str | None:
+    return user.display_name if user else None
+
+
+def _share_request_response(share_request: ShareRequest, requester: User | None) -> ShareRequestResponse:
+    return ShareRequestResponse(
+        id=share_request.id,
+        ledger_id=share_request.ledger_id,
+        requester_id=share_request.requester_id,
+        requester_email=requester.email if requester else None,
+        requester_nickname=requester.nickname if requester else None,
+        requester_display_name=_display_name(requester),
+        role=share_request.role,
+        status=share_request.status,
+        created_at=share_request.created_at,
+        updated_at=share_request.updated_at,
+    )
+
+
+def _member_response(member: LedgerMember, user: User | None) -> MemberResponse:
+    return MemberResponse(
+        id=member.id,
+        ledger_id=member.ledger_id,
+        user_id=member.user_id,
+        email=user.email if user else None,
+        nickname=user.nickname if user else None,
+        display_name=_display_name(user),
+        role=member.role,
+        joined_at=member.joined_at,
+    )
 
 
 @router.post("", response_model=LedgerResponse, status_code=status.HTTP_201_CREATED)
@@ -311,7 +344,7 @@ async def create_share_request(
     payload: ShareRequestCreateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> ShareRequest:
+) -> ShareRequestResponse:
     try:
         resolved_ledger_id = decode_share_code(ledger_id) if len(ledger_id) == 32 else uuid.UUID(ledger_id)
     except ValueError as exc:
@@ -334,9 +367,24 @@ async def create_share_request(
         db,
         ledger.owner_id,
         "LEDGER_SHARE_REQUESTED",
-        {"ledger_id": str(ledger.id), "requester_id": str(current_user.id)},
+        {
+            "ledger_id": str(ledger.id),
+            "ledger_name": ledger.name,
+            "requester_id": str(current_user.id),
+            "requester_display_name": current_user.display_name,
+        },
     )
-    return share_request
+    await add_notification(
+        db,
+        current_user.id,
+        "LEDGER_SHARE_PENDING",
+        {
+            "ledger_id": str(ledger.id),
+            "ledger_name": ledger.name,
+            "role": payload.role,
+        },
+    )
+    return _share_request_response(share_request, current_user)
 
 
 @router.get("/{ledger_id}/share-requests", response_model=list[ShareRequestResponse])
@@ -344,13 +392,16 @@ async def list_share_requests(
     ledger_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> list[ShareRequest]:
+) -> list[ShareRequestResponse]:
     ledger = await get_ledger_or_404(db, ledger_id)
     require_owner(ledger, current_user)
     result = await db.execute(
-        select(ShareRequest).where(ShareRequest.ledger_id == ledger_id).order_by(ShareRequest.created_at.desc())
+        select(ShareRequest, User)
+        .join(User, User.id == ShareRequest.requester_id)
+        .where(ShareRequest.ledger_id == ledger_id)
+        .order_by(ShareRequest.created_at.desc())
     )
-    return list(result.scalars().all())
+    return [_share_request_response(share_request, requester) for share_request, requester in result.all()]
 
 
 @router.post("/{ledger_id}/share-requests/{request_id}/approve", response_model=ShareRequestResponse)
@@ -360,7 +411,7 @@ async def approve_share_request(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> ShareRequest:
+) -> ShareRequestResponse:
     ledger = await get_ledger_or_404(db, ledger_id)
     require_owner(ledger, current_user)
     await ensure_shared_member_limit(db, ledger_id)
@@ -372,12 +423,13 @@ async def approve_share_request(
         db,
         share_request.requester_id,
         "LEDGER_SHARE_APPROVED",
-        {"ledger_id": str(ledger_id)},
+        {"ledger_id": str(ledger_id), "ledger_name": ledger.name, "owner_display_name": current_user.display_name},
     )
     await write_audit_log(db, LEDGER_SHARE_APPROVED, current_user.id, _source_ip(request), {"ledger_id": str(ledger_id)})
     await db.flush()
     await db.refresh(share_request)
-    return share_request
+    requester = await db.get(User, share_request.requester_id)
+    return _share_request_response(share_request, requester)
 
 
 @router.post("/{ledger_id}/share-requests/{request_id}/reject", response_model=ShareRequestResponse)
@@ -387,7 +439,7 @@ async def reject_share_request(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> ShareRequest:
+) -> ShareRequestResponse:
     ledger = await get_ledger_or_404(db, ledger_id)
     require_owner(ledger, current_user)
     share_request = await get_pending_share_request_or_404(db, ledger_id, request_id)
@@ -396,12 +448,13 @@ async def reject_share_request(
         db,
         share_request.requester_id,
         "LEDGER_SHARE_REJECTED",
-        {"ledger_id": str(ledger_id)},
+        {"ledger_id": str(ledger_id), "ledger_name": ledger.name, "owner_display_name": current_user.display_name},
     )
     await write_audit_log(db, LEDGER_SHARE_REJECTED, current_user.id, _source_ip(request), {"ledger_id": str(ledger_id)})
     await db.flush()
     await db.refresh(share_request)
-    return share_request
+    requester = await db.get(User, share_request.requester_id)
+    return _share_request_response(share_request, requester)
 
 
 @router.get("/{ledger_id}/members", response_model=list[MemberResponse])
@@ -409,13 +462,41 @@ async def list_members(
     ledger_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> list[LedgerMember]:
+) -> list[MemberResponse]:
     ledger = await get_ledger_or_404(db, ledger_id)
     require_owner(ledger, current_user)
     result = await db.execute(
-        select(LedgerMember).where(LedgerMember.ledger_id == ledger_id).order_by(LedgerMember.joined_at.asc())
+        select(LedgerMember, User)
+        .join(User, User.id == LedgerMember.user_id)
+        .where(LedgerMember.ledger_id == ledger_id)
+        .order_by(LedgerMember.joined_at.asc())
     )
-    return list(result.scalars().all())
+    return [_member_response(member, user) for member, user in result.all()]
+
+
+@router.patch("/{ledger_id}/members/{user_id}", response_model=MemberResponse)
+async def update_member_role(
+    ledger_id: uuid.UUID,
+    user_id: uuid.UUID,
+    payload: MemberRoleUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MemberResponse:
+    ledger = await get_ledger_or_404(db, ledger_id)
+    require_owner(ledger, current_user)
+    member = await get_membership(db, ledger_id, user_id)
+    if member is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Member not found")
+    member.role = payload.role
+    await add_notification(
+        db,
+        user_id,
+        "LEDGER_MEMBER_ROLE_CHANGED",
+        {"ledger_id": str(ledger_id), "ledger_name": ledger.name, "role": payload.role},
+    )
+    await db.flush()
+    member_user = await db.get(User, user_id)
+    return _member_response(member, member_user)
 
 
 @router.delete("/{ledger_id}/members/{user_id}")
@@ -435,7 +516,7 @@ async def remove_member(
         db,
         user_id,
         "LEDGER_SHARED_USER_REMOVED",
-        {"ledger_id": str(ledger_id)},
+        {"ledger_id": str(ledger_id), "ledger_name": ledger.name},
     )
     await db.delete(member)
     await write_audit_log(db, LEDGER_SHARED_USER_REMOVED, current_user.id, _source_ip(request), {"ledger_id": str(ledger_id)})

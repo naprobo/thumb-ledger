@@ -13,7 +13,10 @@
         </button>
         <h1>{{ t('suggestions.title') }}</h1>
       </div>
-      <button type="button" @click="refresh">{{ t('common.refresh') }}</button>
+      <button type="button" class="refresh-button" :class="{ spinning: isRefreshing }" :disabled="isRefreshing" @click="refresh">
+        <RefreshCw :size="18" aria-hidden="true" />
+        <span>{{ t('common.refresh') }}</span>
+      </button>
     </header>
 
     <div v-if="toastMessage" :class="['toast', toastKind]" role="status">
@@ -90,7 +93,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { ChevronLeft } from '@lucide/vue'
+import { ChevronLeft, RefreshCw } from '@lucide/vue'
 
 import {
   createSuggestion,
@@ -109,6 +112,7 @@ const activeTab = ref<'mine' | 'public'>('mine')
 const mySuggestions = ref<Suggestion[]>([])
 const publicSuggestions = ref<Suggestion[]>([])
 const isInitialLoading = ref(true)
+const isRefreshing = ref(false)
 const isSubmitting = ref(false)
 const toastMessage = ref('')
 const toastKind = ref<'success' | 'error'>('success')
@@ -125,6 +129,7 @@ const canSubmit = computed(() => draft.title.length >= 1 && draft.body.length >=
 onMounted(refresh)
 
 async function refresh() {
+  isRefreshing.value = true
   try {
     const [mine, publicRows] = await Promise.all([listMySuggestions(), listPublicSuggestions()])
     mySuggestions.value = mine
@@ -133,6 +138,7 @@ async function refresh() {
     showToast(t('errors.networkError'), 'error')
   } finally {
     isInitialLoading.value = false
+    isRefreshing.value = false
   }
 }
 
@@ -311,6 +317,16 @@ button:disabled {
   opacity: 0.55;
 }
 
+.refresh-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.refresh-button.spinning svg {
+  animation: spin-refresh 0.8s linear infinite;
+}
+
 .primary-button,
 .selected {
   border-color: #2563eb;
@@ -355,6 +371,12 @@ button:disabled {
     align-items: stretch;
     grid-template-columns: 1fr;
     flex-direction: column;
+  }
+}
+
+@keyframes spin-refresh {
+  to {
+    transform: rotate(360deg);
   }
 }
 </style>

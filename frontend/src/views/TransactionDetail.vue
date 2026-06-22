@@ -181,6 +181,7 @@ const draft = reactive({
   transactionDate: '',
   category: '',
   itemName: '',
+  originalItemName: '',
   necessity: 'essential' as Necessity,
   note: '',
   subjectIds: [] as string[],
@@ -226,7 +227,8 @@ function startEdit() {
   draft.amount = formatMoneyInputValue(transaction.value.amount, transaction.value.currency_code)
   draft.transactionDate = transaction.value.transaction_date
   draft.category = item?.category_name_snapshot || ''
-  draft.itemName = item?.item_name || ''
+  draft.originalItemName = item?.item_name || ''
+  draft.itemName = item?.item_name ? translateLabel(item.item_name, t) : ''
   draft.necessity = transaction.value.necessity === 'non-essential' ? 'non-essential' : 'essential'
   draft.note = transaction.value.note || ''
   draft.subjectIds = transaction.value.transaction_subjects.map((subject) => subject.subject_id)
@@ -257,7 +259,7 @@ async function saveEdit() {
         items: [
           {
             category_name: draft.category,
-            item_name: draft.itemName || undefined,
+            item_name: itemNameForSave(),
             amount: parsedAmount,
             currency_code: transaction.value.currency_code,
           },
@@ -271,6 +273,13 @@ async function saveEdit() {
   } finally {
     isSaving.value = false
   }
+}
+
+function itemNameForSave(): string | undefined {
+  const trimmed = draft.itemName.trim()
+  if (!trimmed) return undefined
+  if (draft.originalItemName && trimmed === translateLabel(draft.originalItemName, t)) return draft.originalItemName
+  return trimmed
 }
 
 async function deleteCurrentTransaction() {

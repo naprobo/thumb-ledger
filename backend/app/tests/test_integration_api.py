@@ -88,6 +88,20 @@ async def register_user(client: AsyncClient, email: str, password: str = PASSWOR
     return response.json()
 
 
+async def register_user_with_nickname(
+    client: AsyncClient,
+    email: str,
+    nickname: str,
+    password: str = PASSWORD,
+) -> dict:
+    response = await client.post(
+        f"{API_PREFIX}/auth/register",
+        json={"email": email, "password": password, "nickname": nickname},
+    )
+    assert response.status_code == 201, response.text
+    return response.json()
+
+
 async def login_user(client: AsyncClient, email: str, password: str = PASSWORD) -> str:
     response = await client.post(
         f"{API_PREFIX}/auth/login",
@@ -191,6 +205,140 @@ async def test_auth_flow_password_reset_invalidates_old_jwt_and_account_delete(
     deleted_me = await client.get(f"{API_PREFIX}/auth/me", headers=auth_headers(new_token))
     assert deleted_me.status_code == 401
     assert await db_session.scalar(select(User).where(User.id == uuid.UUID(user_id))) is None
+
+
+@pytest.mark.asyncio
+async def test_profile_nickname_and_password_change(client: AsyncClient) -> None:
+    email = unique_email("profile")
+    registered = await register_user_with_nickname(client, email, "Tester")
+    assert registered["nickname"] == "Tester"
+    assert registered["display_name"] == "Tester"
+
+    token = await login_user(client, email)
+    profile = await client.patch(
+        f"{API_PREFIX}/auth/me/profile",
+        headers=auth_headers(token),
+        json={"nickname": "Ledger Friend"},
+    )
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["display_name"] == "Ledger Friend"
+
+    change_password = await client.post(
+        f"{API_PREFIX}/auth/me/change-password",
+        headers=auth_headers(token),
+        json={"current_password": PASSWORD, "new_password": NEW_PASSWORD},
+    )
+    assert change_password.status_code == 200, change_password.text
+
+    stale_me = await client.get(f"{API_PREFIX}/auth/me", headers=auth_headers(token))
+    assert stale_me.status_code == 401
+    assert await login_user(client, email, NEW_PASSWORD)
+
+
+@pytest.mark.asyncio
+async def test_share_notifications_and_member_role_updates(client: AsyncClient) -> None:
+    owner_email = unique_email("owner")
+    member_email = unique_email("member")
+    await register_user_with_nickname(client, owner_email, "Owner")
+    member = await register_user_with_nickname(client, member_email, "Member")
+    owner_token = await login_user(client, owner_email)
+    member_token = await login_user(client, member_email)
+    ledger = await create_ledger(client, owner_token, "Shared Ledger")
+
+    share_code = await client.get(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/share-code",
+        headers=auth_headers(owner_token),
+    )
+    assert share_code.status_code == 200
+
+    request = await client.post(
+        f"{API_PREFIX}/ledgers/{share_code.json()['share_code']}/share-requests",
+        headers=auth_headers(member_token),
+        json={"role": "read-write"},
+    )
+    assert request.status_code == 201, request.text
+    assert request.json()["requester_display_name"] == "Member"
+
+    owner_unread = await client.get(f"{API_PREFIX}/notifications/unread-count", headers=auth_headers(owner_token))
+    assert owner_unread.status_code == 200
+    assert owner_unread.json()["unread_count"] == 1
+
+    pending_notifications = await client.get(f"{API_PREFIX}/notifications", headers=auth_headers(member_token))
+    assert pending_notifications.status_code == 200
+    assert pending_notifications.json()[0]["type"] == "LEDGER_SHARE_PENDING"
+    assert pending_notifications.json()[0]["payload"]["role"] == "read-write"
+
+    requests = await client.get(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/share-requests",
+        headers=auth_headers(owner_token),
+    )
+    assert requests.status_code == 200
+    assert requests.json()[0]["requester_display_name"] == "Member"
+
+    approve = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/share-requests/{request.json()['id']}/approve",
+        headers=auth_headers(owner_token),
+    )
+    assert approve.status_code == 200, approve.text
+
+    member_notifications = await client.get(f"{API_PREFIX}/notifications", headers=auth_headers(member_token))
+    assert member_notifications.status_code == 200
+    assert member_notifications.json()[0]["type"] == "LEDGER_SHARE_APPROVED"
+
+    members = await client.get(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/members",
+        headers=auth_headers(owner_token),
+    )
+    assert members.status_code == 200
+    assert members.json()[0]["display_name"] == "Member"
+
+    update_role = await client.patch(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/members/{member['id']}",
+        headers=auth_headers(owner_token),
+        json={"role": "read-only"},
+    )
+    assert update_role.status_code == 200, update_role.text
+    assert update_role.json()["role"] == "read-only"
+
+    forbidden_write = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/transactions",
+        headers=auth_headers(member_token),
+        json={
+            "amount": 100,
+            "currency_code": "JPY",
+            "transaction_date": "2026-06-12",
+            "necessity": "essential",
+            "items": [],
+            "subject_ids": [],
+        },
+    )
+    assert forbidden_write.status_code == 403
+
+    update_role_back = await client.patch(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/members/{member['id']}",
+        headers=auth_headers(owner_token),
+        json={"role": "read-write"},
+    )
+    assert update_role_back.status_code == 200
+    shared_transaction = await create_transaction(client, member_token, ledger["id"], amount=100)
+
+    owner_notifications = await client.get(f"{API_PREFIX}/notifications", headers=auth_headers(owner_token))
+    assert owner_notifications.status_code == 200
+    transaction_notification = next(
+        notification for notification in owner_notifications.json()
+        if notification["type"] == "LEDGER_TRANSACTION_CREATED"
+    )
+    assert transaction_notification["payload"]["transaction_id"] == shared_transaction["id"]
+    assert transaction_notification["payload"]["recorder_display_name"] == "Member"
+
+    mark_read = await client.post(
+        f"{API_PREFIX}/notifications/{member_notifications.json()[0]['id']}/read",
+        headers=auth_headers(member_token),
+    )
+    assert mark_read.status_code == 200
+    member_unread = await client.get(f"{API_PREFIX}/notifications/unread-count", headers=auth_headers(member_token))
+    assert member_unread.status_code == 200
+    assert member_unread.json()["unread_count"] >= 1
 
 
 @pytest.mark.asyncio

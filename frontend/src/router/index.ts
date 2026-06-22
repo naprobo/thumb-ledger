@@ -57,6 +57,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: '/ledgers/:id/members/:userId',
+      name: 'share-member',
+      component: () => import('@/views/ShareMemberView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/ledgers/:id/budget',
       name: 'budget-wizard',
       component: () => import('@/views/BudgetWizard.vue'),
@@ -78,6 +84,24 @@ const router = createRouter({
       path: '/suggestions',
       name: 'suggestions',
       component: () => import('@/views/SuggestionsView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/share/join',
+      name: 'share-join',
+      component: () => import('@/views/ShareJoinView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('@/views/ProfileView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/notifications',
+      name: 'notifications',
+      component: () => import('@/views/NotificationsView.vue'),
       meta: { requiresAuth: true },
     },
     {

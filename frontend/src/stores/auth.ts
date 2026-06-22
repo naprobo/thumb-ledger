@@ -6,6 +6,8 @@ import { setLocale, type SupportedLocale } from '@/i18n'
 interface User {
   id: string
   email: string
+  nickname: string | null
+  display_name: string
   is_admin: boolean
   preferred_language: string
 }
@@ -36,8 +38,8 @@ export const useAuthStore = defineStore('auth', () => {
     await fetchCurrentUser()
   }
 
-  async function register(email: string, password: string): Promise<void> {
-    await apiClient.post('/auth/register', { email, password })
+  async function register(email: string, password: string, nickname?: string): Promise<void> {
+    await apiClient.post('/auth/register', { email, password, nickname: nickname || undefined })
   }
 
   async function fetchCurrentUser(): Promise<void> {
@@ -60,6 +62,20 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = response.data
   }
 
+  async function updateProfile(payload: { nickname?: string | null; preferred_language?: SupportedLocale }): Promise<void> {
+    const response = await apiClient.patch<User>('/auth/me/profile', payload)
+    user.value = response.data
+    if (payload.preferred_language) setLocale(payload.preferred_language)
+  }
+
+  async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+    await apiClient.post('/auth/me/change-password', {
+      current_password: currentPassword,
+      new_password: newPassword,
+    })
+    logout()
+  }
+
   function logout() {
     clearAuth()
   }
@@ -79,6 +95,8 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     fetchCurrentUser,
     updatePreferredLanguage,
+    updateProfile,
+    changePassword,
     logout,
     clearAuth,
     setToken,

@@ -39,6 +39,11 @@
         </label>
 
         <label>
+          <span>{{ t('auth.nickname') }}</span>
+          <input v-model.trim="nickname" type="text" autocomplete="nickname" maxlength="50" />
+        </label>
+
+        <label>
           <span>{{ t('auth.password') }}</span>
           <input
             v-model="password"
@@ -133,6 +138,7 @@ const authStore = useAuthStore()
 
 const currentPage = ref<AuthPage>(pageFromRoute(route.name))
 const email = ref('')
+const nickname = ref('')
 const password = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
@@ -197,9 +203,10 @@ async function handleLogin() {
 async function handleRegister() {
   await runSubmitting(async () => {
     try {
-      await authStore.register(email.value, password.value)
+      await authStore.register(email.value, password.value, nickname.value)
       statusMessage.value = t('auth.registerSuccess')
       password.value = ''
+      nickname.value = ''
       await router.push({ name: 'login' })
     } catch {
       errorMessage.value = t('errors.emailAlreadyUsed')

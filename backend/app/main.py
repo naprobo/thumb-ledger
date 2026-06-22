@@ -123,9 +123,10 @@ def create_app() -> FastAPI:
     # ----------------------------------------------------------------
     # 路由挂载（占位，后续任务中逐步取消注释）
     # ----------------------------------------------------------------
-    from app.routers import admin, auth, budget, images, ledgers, preferences, recurring, suggestions, transactions
+    from app.routers import admin, auth, budget, images, ledgers, notifications, preferences, recurring, suggestions, transactions
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(ledgers.router, prefix="/api/v1")
+    app.include_router(notifications.router, prefix="/api/v1")
     app.include_router(preferences.router, prefix="/api/v1")
     app.include_router(transactions.router, prefix="/api/v1")
     app.include_router(budget.router, prefix="/api/v1")
