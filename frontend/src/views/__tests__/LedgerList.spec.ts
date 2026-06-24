@@ -69,4 +69,35 @@ describe('LedgerList', () => {
     expect(wrapper.find('.settings-icon-button svg').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('设置')
   })
+
+  it('opens a ledger when clicking the total but keeps settings separate', async () => {
+    const router = makeRouter()
+    router.push('/ledgers')
+    await router.isReady()
+    mockLedgers.push({
+      id: 'ledger-1',
+      owner_id: 'user-1',
+      name: 'Home',
+      entry_mode: 'receipt',
+      subject_enabled: false,
+      subject_step_mode: 'disabled',
+      necessity_step_mode: 'disabled',
+      default_currency_code: 'JPY',
+      timezone: 'Asia/Tokyo',
+      budget_enabled: false,
+      total_amounts: { JPY: 1200 },
+      created_at: '',
+      updated_at: '',
+    })
+
+    const wrapper = mount(LedgerList, { global: { plugins: [router] } })
+    await vi.waitFor(() => expect(wrapper.text()).toContain('Home'))
+
+    await wrapper.find('.ledger-total').trigger('click')
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('ledger-detail'))
+
+    await router.push('/ledgers')
+    await wrapper.find('.settings-icon-button').trigger('click')
+    await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('ledger-settings'))
+  })
 })
