@@ -107,11 +107,20 @@
     <AppLoadingPanel v-if="isInitialLoading" class="ledger-loading" />
 
     <section v-else class="ledger-grid">
-      <article v-for="ledger in ledgerStore.ledgers" :key="ledger.id" class="ledger-card">
-        <button class="ledger-main" type="button" @click="router.push({ name: 'ledger-detail', params: { id: ledger.id } })">
+      <article
+        v-for="ledger in ledgerStore.ledgers"
+        :key="ledger.id"
+        class="ledger-card"
+        role="button"
+        tabindex="0"
+        @click="openLedger(ledger.id)"
+        @keydown.enter.prevent="openLedger(ledger.id)"
+        @keydown.space.prevent="openLedger(ledger.id)"
+      >
+        <div class="ledger-main">
           <strong>{{ ledger.name }}</strong>
           <span>{{ modeLabel(ledger.entry_mode) }}</span>
-        </button>
+        </div>
         <span class="ledger-total">{{ ledgerTotalLabel(ledger) }}</span>
         <button
           v-if="canManageLedger(ledger)"
@@ -119,7 +128,7 @@
           class="settings-icon-button"
           :aria-label="t('nav.settings')"
           :title="t('nav.settings')"
-          @click="router.push({ name: 'ledger-settings', params: { id: ledger.id } })"
+          @click.stop="router.push({ name: 'ledger-settings', params: { id: ledger.id } })"
         >
           <SettingsIcon :size="20" aria-hidden="true" />
         </button>
@@ -202,6 +211,10 @@ function ledgerTotalLabel(ledger: Ledger): string {
 
 function canManageLedger(ledger: Ledger): boolean {
   return !authStore.user || ledger.owner_id === authStore.user.id
+}
+
+function openLedger(id: string) {
+  router.push({ name: 'ledger-detail', params: { id } })
 }
 
 async function submitLedger() {
@@ -359,6 +372,16 @@ button:disabled {
   border-radius: 8px;
   padding: 12px;
   background: #fff;
+  cursor: pointer;
+}
+
+.ledger-card:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+.ledger-card:hover {
+  background: #f8fafc;
 }
 
 .ledger-main {
@@ -369,6 +392,7 @@ button:disabled {
   min-width: 0;
   border: 0;
   padding: 0;
+  background: transparent;
 }
 
 .ledger-main span {
