@@ -58,7 +58,7 @@ git pull --ff-only
 ./deploy-app.sh
 ```
 
-`deploy-app.sh` 只构建 `backend` 镜像，并重新应用 `backend` 与 `frontend` 容器；`frontend` 容器直接挂载 `./frontend/dist`，不会执行 `npm ci` 或 `npm run build`。
+`deploy-app.sh` 只构建 `backend` 镜像，并重新应用 `backend`、`frontend` 与外层 `nginx` 容器；`frontend` 容器直接挂载 `./frontend/dist`，不会执行 `npm ci` 或 `npm run build`。外层 `nginx` 需要一起重启，因为 `frontend` 容器重建后 Docker 内部 IP 可能变化。
 
 首次启动：
 

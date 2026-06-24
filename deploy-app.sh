@@ -4,7 +4,7 @@ set -Eeuo pipefail
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 BRANCH="${BRANCH:-}"
 BUILD_SERVICES=(backend)
-APP_SERVICES=(backend frontend)
+APP_SERVICES=(backend frontend nginx)
 export DOCKER_BUILDKIT=1
 
 cd "$(dirname "$0")"
@@ -32,4 +32,4 @@ echo "==> Current app container status"
 docker compose -f "$COMPOSE_FILE" ps "${APP_SERVICES[@]}"
 
 echo "==> Done. Frontend is served from ./frontend/dist without building on this server."
-echo "==> Unchanged services: db, nginx, cloudflared, objstore"
+echo "==> Unchanged services: db, cloudflared, objstore"
