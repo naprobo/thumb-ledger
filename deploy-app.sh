@@ -4,7 +4,7 @@ set -Eeuo pipefail
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 BRANCH="${BRANCH:-}"
 BUILD_SERVICES=(backend)
-APP_SERVICES=(backend frontend nginx)
+APP_SERVICES=(backend frontend)
 export DOCKER_BUILDKIT=1
 
 cd "$(dirname "$0")"
@@ -28,8 +28,11 @@ docker compose -f "$COMPOSE_FILE" build "${BUILD_SERVICES[@]}"
 echo "==> Recreating app containers only, without dependencies"
 docker compose -f "$COMPOSE_FILE" up -d --no-deps "${APP_SERVICES[@]}"
 
+echo "==> Restarting edge nginx to refresh Docker DNS upstreams"
+docker compose -f "$COMPOSE_FILE" restart nginx
+
 echo "==> Current app container status"
-docker compose -f "$COMPOSE_FILE" ps "${APP_SERVICES[@]}"
+docker compose -f "$COMPOSE_FILE" ps "${APP_SERVICES[@]}" nginx
 
 echo "==> Done. Frontend is served from ./frontend/dist without building on this server."
 echo "==> Unchanged services: db, cloudflared, objstore"
