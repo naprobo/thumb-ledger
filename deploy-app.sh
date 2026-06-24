@@ -3,7 +3,8 @@ set -Eeuo pipefail
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 BRANCH="${BRANCH:-}"
-SERVICES=(backend frontend)
+BUILD_SERVICES=(backend)
+APP_SERVICES=(backend frontend)
 export DOCKER_BUILDKIT=1
 
 cd "$(dirname "$0")"
@@ -15,13 +16,20 @@ else
   git pull --ff-only
 fi
 
-echo "==> Building app images only: ${SERVICES[*]}"
-docker compose -f "$COMPOSE_FILE" build "${SERVICES[@]}"
+if [[ ! -f frontend/dist/index.html ]]; then
+  echo "ERROR: frontend/dist/index.html not found."
+  echo "Build frontend before publishing this branch, then commit frontend/dist."
+  exit 1
+fi
+
+echo "==> Building app images only: ${BUILD_SERVICES[*]}"
+docker compose -f "$COMPOSE_FILE" build "${BUILD_SERVICES[@]}"
 
 echo "==> Recreating app containers only, without dependencies"
-docker compose -f "$COMPOSE_FILE" up -d --no-deps "${SERVICES[@]}"
+docker compose -f "$COMPOSE_FILE" up -d --no-deps "${APP_SERVICES[@]}"
 
 echo "==> Current app container status"
-docker compose -f "$COMPOSE_FILE" ps "${SERVICES[@]}"
+docker compose -f "$COMPOSE_FILE" ps "${APP_SERVICES[@]}"
 
-echo "==> Done. Unchanged services: db, nginx, cloudflared, objstore"
+echo "==> Done. Frontend is served from ./frontend/dist without building on this server."
+echo "==> Unchanged services: db, nginx, cloudflared, objstore"

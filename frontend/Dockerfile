@@ -1,21 +1,13 @@
 # syntax=docker/dockerfile:1.7
 
-# Stage 1: Build
-FROM node:22-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm npm ci
-COPY . .
-RUN npm run build
-
-# Stage 2: Production (serve with nginx)
+# Stage 1: Production (serve prebuilt dist with nginx)
 FROM nginx:alpine AS prod
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
 
-# Stage 3: Development (Vite dev server)
+# Stage 2: Development (Vite dev server)
 FROM node:22-alpine AS dev
 WORKDIR /app
 COPY package*.json ./
