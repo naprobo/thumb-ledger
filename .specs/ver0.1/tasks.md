@@ -208,7 +208,7 @@
 
   - [x] 7.6 实现交易统计汇总与 CSV 导出
     - `GET /ledgers/{id}/summary`：接受 time_range 参数（本周/本月/本年/自定义区间），按 Category、Subject、Necessity 分组汇总，按 currency_code 分组不混用
-    - `GET /ledgers/{id}/export`：生成 CSV，列：date、amount、currency_code、category、item_name、subject、necessity、note、recorded_by；设置 `Content-Disposition: attachment` 头
+    - `GET /ledgers/{id}/export`：生成 CSV，列：date、amount、currency_code、category、item_name、location、subject、necessity、note、recorded_by；设置 `Content-Disposition: attachment` 头
     - 导出服务按查询层与 formatter 层分离，MVP 只实现 CSV，但保留 OFX formatter 扩展点
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 21.6, 24.1, 24.2, 24.3, 24.4, 24.5_
 
@@ -538,6 +538,24 @@
     - 后端集成测试：申请加入 → Owner 收通知 → 批准/拒绝 → 申请人收通知 → 标记已读
     - 前端 Vitest：ProfileView、NotificationBell、NotificationsView、ShareJoinView、ShareMemberView、Settings 共享区
     - _Requirements: 1c, 9, 28_
+
+- [x] 29. 账本月视图、消费地点与小票细节
+  - [x] 29.1 精简账本月视图
+    - 月份切换移动到账本标题与操作按钮下方，中间显示完整年月
+    - 移除“消费记录 · 年月”外层卡片标题，直接显示本月合计、交易记录与分类金额占比
+  - [x] 29.2 增加消费地点
+    - Transaction 增加 `location_name`，Ledger 增加 `location_step_mode`
+    - Wizard 在消费名称后、必要性前显示地点选择，可从历史偏好选择、追加或按设置跳过
+    - 详情编辑、CSV 和偏好 API 支持地点
+  - [x] 29.3 增加小票模式可选消费细节
+    - Ledger 增加 `receipt_item_enabled`，新建与设置页面均可配置
+    - receipt 模式启用后显示可跳过的消费名称步骤；item 模式继续要求消费名称
+    - 新建账本时将消费细节、花费对象、必要性和消费地点拆分为独立标签选择屏；货币屏不显示时区输入
+    - receipt 消费名称复用 item 模式预置标签；消费名称与地点的可跳过操作使用列表顶部警示 icon 按钮
+  - [x] 29.4 增加迁移与回归测试
+    - Alembic 迁移增加账本配置与交易地点字段
+    - 前端覆盖步骤顺序、跳过细节、追加地点和月视图结构；后端覆盖地点持久化与偏好返回
+    - _Requirements: 2.10, 2.11, 4.8, 4.11 - 4.14, 5.1, 5.1a, 7.2_
 
 ---
 

@@ -3,12 +3,15 @@ import { apiClient } from '@/api'
 export type EntryMode = 'receipt' | 'item'
 export type SubjectStepMode = 'required' | 'optional' | 'disabled'
 export type NecessityStepMode = 'required' | 'optional' | 'disabled'
+export type LocationStepMode = 'required' | 'optional' | 'disabled'
 
 export interface Ledger {
   id: string
   owner_id: string
   name: string
   entry_mode: EntryMode
+  receipt_item_enabled?: boolean
+  location_step_mode?: LocationStepMode
   subject_enabled: boolean
   subject_step_mode: SubjectStepMode
   necessity_step_mode: NecessityStepMode
@@ -23,6 +26,8 @@ export interface Ledger {
 export interface LedgerCreatePayload {
   name: string
   entry_mode: EntryMode
+  receipt_item_enabled: boolean
+  location_step_mode: LocationStepMode
   subject_enabled: boolean
   subject_step_mode: SubjectStepMode
   necessity_step_mode: NecessityStepMode
@@ -33,6 +38,8 @@ export interface LedgerCreatePayload {
 
 export interface LedgerUpdatePayload {
   name?: string
+  receipt_item_enabled?: boolean
+  location_step_mode?: LocationStepMode
   subject_step_mode?: SubjectStepMode
   necessity_step_mode?: NecessityStepMode
   default_currency_code?: string

@@ -14,6 +14,7 @@ vi.mock('@/api/preferences', () => ({
   deleteSubject: vi.fn(async () => undefined),
   getPreferredCategories: vi.fn(async () => ['category.food', 'category.transport']),
   getPreferredItems: vi.fn(async () => preferredItems),
+  getPreferredLocations: vi.fn(async () => ['駅前スーパー']),
   getSubjectPreferenceDetails: vi.fn(async () => [
     { value: 'subject.self', selection_count: 4, last_selected_at: '2099-01-01T00:00:00Z' },
     { value: 'subject.mom', selection_count: 0, last_selected_at: null },
@@ -43,6 +44,7 @@ function ledger(overrides: Partial<Ledger> = {}): Ledger {
     subject_enabled: true,
     subject_step_mode: 'required',
     necessity_step_mode: 'required',
+    location_step_mode: 'disabled',
     default_currency_code: 'JPY',
     timezone: 'Asia/Tokyo',
     budget_enabled: false,
@@ -71,6 +73,32 @@ describe('WizardFlow', () => {
 
   it('builds full item-mode step order from ledger settings', () => {
     expect(buildWizardSteps(ledger())).toEqual(['amount', 'category', 'item', 'necessity', 'subject'])
+  })
+
+  it('places location after spending name and before necessity when enabled', () => {
+    expect(buildWizardSteps(ledger({ location_step_mode: 'optional' }))).toEqual([
+      'amount',
+      'category',
+      'item',
+      'location',
+      'necessity',
+      'subject',
+    ])
+  })
+
+  it('adds an optional detail step to receipt mode when configured', () => {
+    expect(
+      buildWizardSteps(
+        ledger({
+          entry_mode: 'receipt',
+          receipt_item_enabled: true,
+          location_step_mode: 'disabled',
+          necessity_step_mode: 'disabled',
+          subject_enabled: false,
+          subject_step_mode: 'disabled',
+        }),
+      ),
+    ).toEqual(['amount', 'category', 'item'])
   })
 
   it('omits item, necessity, and subject steps when disabled by ledger settings', () => {
@@ -555,6 +583,48 @@ describe('WizardFlow', () => {
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '自定义')?.trigger('click')
     expect(wrapper.find('.custom-item-field input').exists()).toBe(true)
     expect(wrapper.find('.custom-item-field').classes()).toContain('custom-item-field')
+  })
+
+  it('lets receipt details be skipped and saves an added spending location', async () => {
+    const wrapper = mount(WizardFlow, {
+      props: {
+        ledger: ledger({
+          entry_mode: 'receipt',
+          receipt_item_enabled: true,
+          location_step_mode: 'optional',
+          necessity_step_mode: 'disabled',
+          subject_enabled: false,
+          subject_step_mode: 'disabled',
+        }),
+      },
+    })
+    await vi.waitFor(() => expect(wrapper.find('.keypad').exists()).toBe(true))
+    await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
+    await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
+
+    await vi.waitFor(() => expect(wrapper.find('.wizard-titlebar h2').text()).toBe('消费名称'))
+    await vi.waitFor(() => expect(wrapper.text()).toContain('米'))
+    expect(wrapper.text().indexOf('跳过')).toBeLessThan(wrapper.text().indexOf('米'))
+    expect(wrapper.find('.skip-button svg').exists()).toBe(true)
+    await wrapper.find('.skip-button').trigger('click')
+    await vi.waitFor(() => expect(wrapper.find('.wizard-titlebar h2').text()).toBe('在哪里消费'))
+    expect(wrapper.text().indexOf('跳过')).toBeLessThan(wrapper.text().indexOf('駅前スーパー'))
+    expect(wrapper.find('.skip-button svg').exists()).toBe(true)
+    await wrapper.findAll('.add-chip').find((button) => button.text().includes('追加地点'))?.trigger('click')
+    await wrapper.find('.location-field input').setValue('公司附近')
+    await wrapper.find('.location-field button').trigger('click')
+
+    expect(createTransaction).not.toHaveBeenCalled()
+    expect(wrapper.find('.location-field').exists()).toBe(false)
+    expect(wrapper.findAll('.chip-grid button').some((button) => button.text() === '公司附近')).toBe(true)
+    await wrapper.findAll('.chip-grid button').find((button) => button.text() === '公司附近')?.trigger('click')
+
+    await vi.waitFor(() => expect(createTransaction).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(createTransaction).mock.calls[0][1]).toMatchObject({
+      location_name: '公司附近',
+      items: [{ item_name: undefined }],
+    })
   })
 
   it('refreshes item tags after saving a custom item and recording another', async () => {

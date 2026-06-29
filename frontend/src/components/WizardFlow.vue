@@ -46,7 +46,18 @@
         v-else-if="currentStep === 'item'"
         :items="items"
         :model-value="draft.itemName"
+        :optional="ledger.entry_mode === 'receipt'"
         @select="selectItem"
+        @skip="skipItem"
+      />
+      <WizardStepLocation
+        v-else-if="currentStep === 'location'"
+        :locations="locations"
+        :model-value="draft.locationName"
+        :optional="ledger.location_step_mode !== 'required'"
+        @select="selectLocation"
+        @add="addLocation"
+        @skip="skipLocation"
       />
       <WizardStepNecessity
         v-else-if="currentStep === 'necessity'"
@@ -91,11 +102,12 @@ import { useI18n } from 'vue-i18n'
 import { ChevronLeft, Trash2, X } from '@lucide/vue'
 
 import type { Ledger } from '@/api/ledgers'
-import { createSubject, deleteSubject, getPreferredCategories, getPreferredItems, getSubjectPreferenceDetails, listSubjects, type Subject } from '@/api/preferences'
+import { createSubject, deleteSubject, getPreferredCategories, getPreferredItems, getPreferredLocations, getSubjectPreferenceDetails, listSubjects, type Subject } from '@/api/preferences'
 import { createTransaction, type Necessity } from '@/api/transactions'
 import WizardStepAmount from '@/components/wizard/WizardStepAmount.vue'
 import WizardStepCategory from '@/components/wizard/WizardStepCategory.vue'
 import WizardStepItem from '@/components/wizard/WizardStepItem.vue'
+import WizardStepLocation from '@/components/wizard/WizardStepLocation.vue'
 import WizardStepNecessity from '@/components/wizard/WizardStepNecessity.vue'
 import WizardStepSubject, { type SubjectChoice } from '@/components/wizard/WizardStepSubject.vue'
 import { buildWizardSteps, type WizardDraft } from '@/components/wizard/types'
@@ -106,6 +118,7 @@ const { t } = useI18n()
 
 const categories = ref<string[]>([])
 const items = ref<string[]>([])
+const locations = ref<string[]>([])
 const subjects = ref<SubjectChoice[]>([])
 const currentIndex = ref(0)
 const isSaving = ref(false)
@@ -130,6 +143,8 @@ const titleText = computed(() => {
       return t('transaction.category')
     case 'item':
       return t('transaction.itemName')
+    case 'location':
+      return t('transaction.location')
     case 'necessity':
       return t('transaction.necessity')
     case 'subject':
@@ -155,7 +170,7 @@ watch(
 watch(
   () => draft.category,
   async (category) => {
-    if (category && props.ledger.entry_mode === 'item') {
+    if (category && (props.ledger.entry_mode === 'item' || props.ledger.receipt_item_enabled)) {
       items.value = await getPreferredItems(props.ledger.id, category)
     }
   },
@@ -172,6 +187,7 @@ function defaultDraft(): WizardDraft {
     transactionDate: lastTransactionDate.value,
     category: '',
     itemName: '',
+    locationName: '',
     necessity: null,
     subjectName: '',
     subjectIds: [],
@@ -180,7 +196,12 @@ function defaultDraft(): WizardDraft {
 }
 
 async function loadPreferences() {
-  categories.value = await getPreferredCategories(props.ledger.id)
+  const [preferredCategories, preferredLocations] = await Promise.all([
+    getPreferredCategories(props.ledger.id),
+    getPreferredLocations(props.ledger.id),
+  ])
+  categories.value = preferredCategories
+  locations.value = preferredLocations
   const preferredSubjects = await getSubjectPreferenceDetails(props.ledger.id)
   const subjectRows = await listSubjects(props.ledger.id)
   subjects.value = preferredSubjects
@@ -209,7 +230,7 @@ function handleDateChange(value: string) {
 
 async function selectCategory(category: string) {
   draft.category = category
-  if (props.ledger.entry_mode === 'item') {
+  if (props.ledger.entry_mode === 'item' || props.ledger.receipt_item_enabled) {
     next()
     return
   }
@@ -219,6 +240,27 @@ async function selectCategory(category: string) {
 async function selectItem(item: string) {
   draft.itemName = item
   if (item.trim()) await advanceOrSave()
+}
+
+async function skipItem() {
+  draft.itemName = ''
+  await advanceOrSave()
+}
+
+async function selectLocation(location: string) {
+  draft.locationName = location
+  await advanceOrSave()
+}
+
+function addLocation(location: string) {
+  if (!locations.value.includes(location)) {
+    locations.value = [...locations.value, location]
+  }
+}
+
+async function skipLocation() {
+  draft.locationName = ''
+  await advanceOrSave()
 }
 
 async function selectNecessity(necessity: Necessity) {
@@ -300,7 +342,7 @@ async function save() {
       ? [
           {
             category_name: draft.category,
-            item_name: props.ledger.entry_mode === 'item' ? draft.itemName : undefined,
+            item_name: draft.itemName || undefined,
             amount: draft.amount,
             currency_code: draft.currencyCode,
           },
@@ -312,6 +354,7 @@ async function save() {
       transaction_date: draft.transactionDate,
       necessity: props.ledger.necessity_step_mode !== 'disabled' ? draft.necessity || 'essential' : 'essential',
       note: draft.note || undefined,
+      location_name: draft.locationName || undefined,
       items,
       subject_ids: draft.subjectIds,
     }

@@ -1,7 +1,7 @@
 import type { Ledger } from '@/api/ledgers'
 import type { Necessity } from '@/api/transactions'
 
-export type WizardStepId = 'amount' | 'category' | 'item' | 'necessity' | 'subject'
+export type WizardStepId = 'amount' | 'category' | 'item' | 'location' | 'necessity' | 'subject'
 
 export interface WizardDraft {
   amount: number | null
@@ -9,6 +9,7 @@ export interface WizardDraft {
   transactionDate: string
   category: string
   itemName: string
+  locationName: string
   necessity: Necessity | null
   subjectName: string
   subjectIds: string[]
@@ -17,8 +18,11 @@ export interface WizardDraft {
 
 export function buildWizardSteps(ledger: Ledger): WizardStepId[] {
   const steps: WizardStepId[] = ['amount', 'category']
-  if (ledger.entry_mode === 'item') {
+  if (ledger.entry_mode === 'item' || ledger.receipt_item_enabled) {
     steps.push('item')
+  }
+  if (ledger.location_step_mode !== 'disabled') {
+    steps.push('location')
   }
   if (ledger.necessity_step_mode !== 'disabled') {
     steps.push('necessity')
