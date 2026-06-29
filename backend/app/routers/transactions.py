@@ -196,7 +196,8 @@ async def update_transaction(
         ensure_item_total_matches_transaction(transaction.amount, transaction.items)
     await db.flush()
     await update_preferences_for_transaction(db, ledger_id, current_user.id, transaction)
-    return transaction
+    await db.flush()
+    return await get_transaction_or_404(db, ledger_id, transaction_id)
 
 
 @router.delete("/transactions/{transaction_id}")
