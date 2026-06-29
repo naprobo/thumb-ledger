@@ -47,7 +47,7 @@ git add frontend/dist
 如果本地 Node/npm 的可选依赖在 Windows 上异常，可以用 Docker 在本机生成同样的 `dist`：
 
 ```bash
-docker run --rm -v "$PWD:/app" -w /app/frontend node:22-alpine sh -lc "npm ci && npm run build"
+docker run --rm -v "${PWD}:/app" -w /app/frontend node:22-alpine sh -lc "npm ci && npm run build"
 git add frontend/dist
 ```
 
