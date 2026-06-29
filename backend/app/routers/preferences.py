@@ -14,7 +14,6 @@ from app.services.ledger import get_ledger_or_404, require_read_ledger
 from app.services.preference import (
     get_sorted_categories,
     get_sorted_items,
-    get_sorted_locations,
     get_sorted_subjects,
     get_subject_preference_details,
 )
@@ -72,17 +71,4 @@ async def items(
     await require_read_ledger(db, ledger, current_user)
     return PreferenceListResponse(
         items=await get_sorted_items(db, ledger_id, current_user.id, category)
-    )
-
-
-@router.get("/locations", response_model=PreferenceListResponse)
-async def locations(
-    ledger_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> PreferenceListResponse:
-    ledger = await get_ledger_or_404(db, ledger_id)
-    await require_read_ledger(db, ledger, current_user)
-    return PreferenceListResponse(
-        items=await get_sorted_locations(db, ledger_id, current_user.id)
     )

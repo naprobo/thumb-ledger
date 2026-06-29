@@ -32,7 +32,6 @@ class TransactionCreateRequest(BaseModel):
     transaction_date: Optional[date] = None
     necessity: Necessity = "essential"
     note: Optional[str] = Field(None, max_length=500)
-    location_name: Optional[str] = Field(None, min_length=1, max_length=100)
     items: list[TransactionItemRequest] = Field(default_factory=list, max_length=100)
     subject_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
 
@@ -55,7 +54,6 @@ class TransactionUpdateRequest(BaseModel):
     transaction_date: Optional[date] = None
     necessity: Optional[Necessity] = None
     note: Optional[str] = Field(None, max_length=500)
-    location_name: Optional[str] = Field(None, min_length=1, max_length=100)
     items: Optional[list[TransactionItemRequest]] = Field(None, max_length=100)
     subject_ids: Optional[list[uuid.UUID]] = Field(None, max_length=20)
 
@@ -92,7 +90,6 @@ class TransactionResponse(BaseModel):
     transaction_date: date
     necessity: str
     note: Optional[str]
-    location_name: Optional[str]
     created_at: datetime
     updated_at: datetime
     items: list[TransactionItemResponse] = []

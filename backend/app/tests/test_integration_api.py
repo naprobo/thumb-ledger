@@ -136,7 +136,6 @@ async def create_transaction(
     ledger_id: str,
     amount: int = 1200,
     note: str = "integration purchase",
-    location_name: str | None = None,
 ) -> dict:
     response = await client.post(
         f"{API_PREFIX}/ledgers/{ledger_id}/transactions",
@@ -147,7 +146,6 @@ async def create_transaction(
             "transaction_date": "2026-06-12",
             "necessity": "essential",
             "note": note,
-            "location_name": location_name,
             "items": [],
             "subject_ids": [],
         },
@@ -349,13 +347,7 @@ async def test_complete_bookkeeping_flow_creates_and_lists_transaction(client: A
     await register_user(client, email)
     token = await login_user(client, email)
     ledger = await create_ledger(client, token)
-    transaction = await create_transaction(
-        client,
-        token,
-        ledger["id"],
-        amount=3456,
-        location_name="Station Market",
-    )
+    transaction = await create_transaction(client, token, ledger["id"], amount=3456)
 
     response = await client.get(
         f"{API_PREFIX}/ledgers/{ledger['id']}/transactions",
@@ -365,15 +357,7 @@ async def test_complete_bookkeeping_flow_creates_and_lists_transaction(client: A
     body = response.json()
     assert body["total"] == 1
     assert body["items"][0]["id"] == transaction["id"]
-    assert body["items"][0]["location_name"] == "Station Market"
     assert body["page_total_amounts"] == {"JPY": 3456}
-
-    locations = await client.get(
-        f"{API_PREFIX}/ledgers/{ledger['id']}/preferences/locations",
-        headers=auth_headers(token),
-    )
-    assert locations.status_code == 200
-    assert locations.json()["items"] == ["Station Market"]
 
 
 @pytest.mark.asyncio

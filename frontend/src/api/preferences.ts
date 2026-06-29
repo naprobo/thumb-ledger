@@ -35,11 +35,6 @@ export async function getPreferredItems(ledgerId: string, category: string): Pro
   return response.data.items
 }
 
-export async function getPreferredLocations(ledgerId: string): Promise<string[]> {
-  const response = await apiClient.get<PreferenceListResponse>(`/ledgers/${ledgerId}/preferences/locations`)
-  return response.data.items
-}
-
 export async function getPreferredSubjects(ledgerId: string): Promise<string[]> {
   const response = await apiClient.get<PreferenceListResponse>(`/ledgers/${ledgerId}/preferences/subjects`)
   return response.data.items

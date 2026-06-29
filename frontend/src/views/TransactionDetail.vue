@@ -34,10 +34,6 @@
             <dt>{{ t('transaction.itemName') }}</dt>
             <dd>{{ itemLabel }}</dd>
           </div>
-          <div>
-            <dt>{{ t('transaction.location') }}</dt>
-            <dd>{{ transaction.location_name || '-' }}</dd>
-          </div>
           <div v-if="ledger?.necessity_step_mode !== 'disabled'">
             <dt>{{ t('transaction.necessity') }}</dt>
             <dd>{{ necessityLabel(transaction.necessity) }}</dd>
@@ -104,13 +100,6 @@
             v-model.trim="draft.itemName"
             :label="t('transaction.itemName')"
             :disabled="!canEditSimpleEntry"
-            maxlength="100"
-            variant="outlined"
-            density="comfortable"
-          />
-          <v-text-field
-            v-model.trim="draft.locationName"
-            :label="t('transaction.location')"
             maxlength="100"
             variant="outlined"
             density="comfortable"
@@ -193,7 +182,6 @@ const draft = reactive({
   category: '',
   itemName: '',
   originalItemName: '',
-  locationName: '',
   necessity: 'essential' as Necessity,
   note: '',
   subjectIds: [] as string[],
@@ -241,7 +229,6 @@ function startEdit() {
   draft.category = item?.category_name_snapshot || ''
   draft.originalItemName = item?.item_name || ''
   draft.itemName = item?.item_name ? translateLabel(item.item_name, t) : ''
-  draft.locationName = transaction.value.location_name || ''
   draft.necessity = transaction.value.necessity === 'non-essential' ? 'non-essential' : 'essential'
   draft.note = transaction.value.note || ''
   draft.subjectIds = transaction.value.transaction_subjects.map((subject) => subject.subject_id)
@@ -263,7 +250,6 @@ async function saveEdit() {
       transaction_date: draft.transactionDate,
       necessity: draft.necessity,
       note: draft.note || null,
-      location_name: draft.locationName || null,
       subject_ids: draft.subjectIds,
     }
     if (canEditSimpleEntry.value) {

@@ -148,7 +148,6 @@ def _transaction(
         transaction_date=transaction_date,
         necessity="essential",
         note="",
-        location_name="",
         items=[
             SimpleNamespace(
                 amount=amount,

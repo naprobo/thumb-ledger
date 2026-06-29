@@ -41,17 +41,6 @@ class Ledger(Base):
         String(20),
         nullable=False,
     )
-    receipt_item_enabled: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=False,
-    )
-    # 'required' | 'optional' | 'disabled'
-    location_step_mode: Mapped[str] = mapped_column(
-        String(20),
-        default="optional",
-        nullable=False,
-    )
     subject_enabled: Mapped[bool] = mapped_column(
         Boolean,
         default=False,

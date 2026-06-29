@@ -1,10 +1,6 @@
 <template>
   <section class="wizard-step">
     <h2>{{ t('transaction.itemName') }}</h2>
-    <v-btn v-if="optional" class="skip-button" color="warning" variant="tonal" size="large" block @click="$emit('skip')">
-      <AlertTriangle :size="20" aria-hidden="true" />
-      <span>{{ t('transaction.skip') }}</span>
-    </v-btn>
     <div class="chip-grid">
       <v-btn
         v-for="item in items"
@@ -57,13 +53,11 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertTriangle, Plus } from '@lucide/vue'
+import { Plus } from '@lucide/vue'
 import { translateLabel } from '@/i18n/labels'
 
-const props = withDefaults(defineProps<{ items: string[]; modelValue: string; optional?: boolean }>(), {
-  optional: false,
-})
-const emit = defineEmits<{ select: [item: string]; skip: [] }>()
+const props = defineProps<{ items: string[]; modelValue: string }>()
+const emit = defineEmits<{ select: [item: string] }>()
 const { t } = useI18n()
 const isCustomOpen = ref(false)
 const customValue = ref('')
@@ -107,16 +101,5 @@ function confirmCustom() {
 .primary-button {
   min-width: 88px;
   font-weight: 700;
-}
-
-.skip-button {
-  margin-bottom: 4px;
-  font-weight: 800;
-}
-
-.skip-button :deep(.v-btn__content) {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 </style>
