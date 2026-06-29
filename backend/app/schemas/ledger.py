@@ -13,6 +13,7 @@ from app.services.currency import validate_supported_currency
 EntryMode = Literal["receipt", "item"]
 SubjectStepMode = Literal["required", "optional", "disabled"]
 NecessityStepMode = Literal["required", "optional", "disabled"]
+LocationStepMode = Literal["required", "optional", "disabled"]
 ShareRole = Literal["read-write", "read-only"]
 ShareStatus = Literal["pending", "approved", "rejected"]
 
@@ -20,6 +21,8 @@ ShareStatus = Literal["pending", "approved", "rejected"]
 class LedgerCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
     entry_mode: EntryMode
+    receipt_item_enabled: bool = False
+    location_step_mode: LocationStepMode = "optional"
     subject_enabled: bool = False
     subject_step_mode: SubjectStepMode = "required"
     necessity_step_mode: NecessityStepMode = "disabled"
@@ -35,6 +38,8 @@ class LedgerCreateRequest(BaseModel):
 
 class LedgerUpdateRequest(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=50)
+    receipt_item_enabled: Optional[bool] = None
+    location_step_mode: Optional[LocationStepMode] = None
     subject_step_mode: Optional[SubjectStepMode] = None
     necessity_step_mode: Optional[NecessityStepMode] = None
     default_currency_code: Optional[str] = Field(None, min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
@@ -50,6 +55,8 @@ class LedgerResponse(BaseModel):
     owner_id: uuid.UUID
     name: str
     entry_mode: str
+    receipt_item_enabled: bool
+    location_step_mode: str
     subject_enabled: bool
     subject_step_mode: str
     necessity_step_mode: str

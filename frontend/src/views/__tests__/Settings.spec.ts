@@ -73,6 +73,9 @@ describe('Settings', () => {
     expect(wrapper.find('input[maxlength="50"]').exists()).toBe(true)
     expect(wrapper.find('select option[value="ja"]').exists()).toBe(false)
     expect(wrapper.find('.back-button').exists()).toBe(true)
+    expect(wrapper.find('.setting-toggle span').text()).toBe('可记录消费细节')
+    expect(wrapper.find('.setting-toggle input[type="checkbox"]').exists()).toBe(true)
+    expect(wrapper.find('.setting-toggle').element.lastElementChild?.tagName).toBe('INPUT')
   })
 
   it('keeps the compact settings layout order and avoids duplicate settings headings', async () => {
@@ -105,6 +108,8 @@ describe('Settings', () => {
     await vi.waitFor(() => expect(wrapper.find('.toast.success').exists()).toBe(true))
     expect(updateLedger).toHaveBeenCalledWith('ledger-1', {
       name: 'New Home',
+      receipt_item_enabled: false,
+      location_step_mode: 'optional',
       subject_step_mode: 'required',
       necessity_step_mode: 'required',
       default_currency_code: 'JPY',

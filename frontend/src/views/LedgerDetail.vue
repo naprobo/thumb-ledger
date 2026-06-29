@@ -52,6 +52,18 @@
         </div>
       </header>
 
+      <nav class="month-nav" :aria-label="t('transaction.monthNavigation')">
+        <v-btn variant="tonal" :aria-label="previousMonthLabel" :title="previousMonthLabel" @click="changeMonth(-1)">
+          <ChevronLeft :size="21" aria-hidden="true" />
+          <span>{{ previousMonthLabel }}</span>
+        </v-btn>
+        <strong>{{ currentMonthLabel }}</strong>
+        <v-btn variant="tonal" :aria-label="nextMonthLabel" :title="nextMonthLabel" @click="changeMonth(1)">
+          <span>{{ nextMonthLabel }}</span>
+          <ChevronRight :size="21" aria-hidden="true" />
+        </v-btn>
+      </nav>
+
       <v-card v-if="budget" class="budget-panel" :class="budgetWarningClass" variant="outlined" rounded="lg">
         <v-card-text>
           <strong>{{ t('budget.progress') }}</strong>
@@ -68,12 +80,8 @@
         </v-card-text>
       </v-card>
 
-      <v-card class="list-panel" :class="{ loading: isInitialLoading }" variant="outlined" rounded="lg">
-        <v-card-title class="section-heading">
-          <span>{{ t('transaction.list') }} · {{ currentMonthLabel }}</span>
-        </v-card-title>
-
-        <v-card-text>
+      <section class="records-section" :class="{ loading: isInitialLoading }">
+        <div class="records-content">
           <AppLoadingPanel v-if="isInitialLoading" />
 
           <v-expansion-panels v-else-if="transactionList.items.length" v-model="monthSummaryPanel" class="month-records" variant="accordion">
@@ -153,19 +161,8 @@
               </div>
             </v-card-text>
           </v-card>
-        </v-card-text>
-
-        <div class="month-nav">
-          <v-btn variant="tonal" @click="changeMonth(-1)">
-            <ChevronLeft :size="18" aria-hidden="true" />
-            <span>{{ previousMonthLabel }}</span>
-          </v-btn>
-          <v-btn variant="tonal" @click="changeMonth(1)">
-            <span>{{ nextMonthLabel }}</span>
-            <ChevronRight :size="18" aria-hidden="true" />
-          </v-btn>
         </div>
-      </v-card>
+      </section>
     </template>
   </main>
 </template>
@@ -186,7 +183,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useLedgerStore } from '@/stores/ledgers'
 import { formatMoney } from '@/utils/money'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -352,11 +349,11 @@ function formatDate(value: Date): string {
 }
 
 function formatMonthHeading(value: Date): string {
-  return `${value.getFullYear()}年${value.getMonth() + 1}月`
+  return new Intl.DateTimeFormat(locale.value, { year: 'numeric', month: 'long' }).format(value)
 }
 
 function formatMonthButton(value: Date): string {
-  return `${value.getMonth() + 1}月`
+  return new Intl.DateTimeFormat(locale.value, { month: 'long' }).format(value)
 }
 
 function describeArc(cx: number, cy: number, radius: number, startAngle: number, endAngle: number): string {
@@ -453,12 +450,17 @@ p {
 }
 
 .budget-panel,
-.list-panel {
+.records-section {
   margin-top: 16px;
 }
 
-.list-panel.loading {
+.records-section.loading {
   min-height: 320px;
+}
+
+.records-content {
+  display: grid;
+  gap: 18px;
 }
 
 .budget-panel.soft {
@@ -694,11 +696,23 @@ p {
 }
 
 .month-nav {
-  margin: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: min(100%, 520px);
+  margin: 0 auto 18px;
+}
+
+.month-nav strong {
+  text-align: center;
+  font-size: 1.08rem;
 }
 
 .month-nav .v-btn {
-  min-width: 112px;
+  width: 100%;
+  min-width: 0;
+  height: 48px;
 }
 
 @media (max-width: 640px) {

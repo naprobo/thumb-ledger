@@ -62,6 +62,10 @@ class Transaction(Base):
         String(500),
         nullable=True,
     )
+    location_name: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+    )
     recurring_transaction_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("recurring_transactions.id", ondelete="SET NULL"),
         nullable=True,
