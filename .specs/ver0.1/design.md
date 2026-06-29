@@ -226,6 +226,7 @@ Wizard Flow 前端交互约束：
 - `WizardStepCategory.vue` 默认展示偏好排序后的分类标签。receipt（一张小票一笔）模式选择 Category 后，根据 `receipt_item_enabled` 决定进入可跳过的消费名称步骤或继续下一步。
 - `WizardStepItem.vue` 在 item（逐商品）模式中必填，在启用消费细节的 receipt 模式中可跳过；两种模式均加载同一套分类预置/偏好消费名称，自定义消费名称通过 `+ 自定义` 标签入口打开文本输入框。可跳过时，带警示 icon 的跳过按钮置于标签列表上方。
 - `WizardStepLocation.vue` 位于消费名称之后、必要性之前，显示历史常用地点与 `+ 追加`；追加地点后先回到完整标签列表，不自动选择或前进，用户明确点击新标签后才进入下一步。`location_step_mode=optional` 时在列表上方显示带警示 icon 的跳过按钮，`required` 时必须选择。
+- `TransactionDetail.vue` 编辑消费名称和消费地点时使用 combobox，既可从偏好列表选择，也可自由输入；系统消费名称在界面显示翻译文案，保存时恢复为原始 `item.*` 键，自定义文本原样保存。
 - `WizardFlow.vue` 统一渲染顶部标题栏：Amount 标题为"输入金额"，Amount 左侧返回回到账本主页，后续步骤左侧返回到上一步；完成页标题为"记录成功"且不提供返回动作。
 - `WizardFlow.vue` 在步骤切换和进入完成页时应将当前 Wizard/页面滚动位置重置到顶部，避免上一屏滚动位置影响下一屏。
 - `WizardStepNecessity.vue` 不做默认预选或超时自动保存；"刚需"、"非刚需"、"关闭此步骤"均使用同等级的大块按钮。

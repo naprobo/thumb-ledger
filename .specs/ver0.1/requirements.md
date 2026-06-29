@@ -154,6 +154,7 @@
 12. THE Location step SHALL display previously used locations ordered by the current User's selection count and provide a "+ 追加" action that reveals a text input only after being tapped.
 13. WHEN Location_Step_Mode is "optional", the Location step SHALL provide a one-tap skip action; WHEN it is "required", skipping or saving an empty location SHALL not be allowed.
 14. THE Transaction_Service SHALL persist Location as a transaction-level text snapshot and expose it in transaction detail/update APIs and CSV export.
+15. WHEN editing a Transaction, THE UI SHALL allow both Item name and Location to be selected from their preference lists or entered as free-form text; selecting a localized system Item SHALL preserve its original translation key.
 
 ---
 
