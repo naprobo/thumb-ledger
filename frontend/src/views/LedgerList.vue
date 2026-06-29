@@ -20,50 +20,92 @@
     <section v-if="showWizard" class="tool-panel" aria-live="polite">
       <div class="wizard-header">
         <strong>{{ t('ledger.create') }}</strong>
-        <span>{{ wizardStep + 1 }}/5</span>
+        <span>{{ wizardStep + 1 }}/{{ wizardSteps.length }}</span>
       </div>
 
       <form class="wizard-form" @submit.prevent="submitLedger">
-        <fieldset v-if="wizardStep === 0">
+        <fieldset v-if="currentWizardStep === 'name'">
           <legend>{{ t('ledger.name') }}</legend>
           <input v-model.trim="draft.name" maxlength="50" required :placeholder="t('ledger.namePlaceholder')" />
         </fieldset>
 
-        <fieldset v-else-if="wizardStep === 1">
+        <fieldset v-else-if="currentWizardStep === 'entryMode'">
           <legend>{{ t('ledger.entryMode') }}</legend>
-          <div class="segmented">
-            <label>
-              <input v-model="draft.entry_mode" type="radio" value="receipt" />
-              <span>{{ t('ledger.entryModeReceipt') }}</span>
-            </label>
-            <label>
-              <input v-model="draft.entry_mode" type="radio" value="item" />
-              <span>{{ t('ledger.entryModeItem') }}</span>
-            </label>
+          <div class="choice-tags two-options">
+            <button type="button" :class="{ selected: draft.entry_mode === 'receipt' }" :aria-pressed="draft.entry_mode === 'receipt'" @click="draft.entry_mode = 'receipt'">
+              {{ t('ledger.entryModeReceipt') }}
+            </button>
+            <button type="button" :class="{ selected: draft.entry_mode === 'item' }" :aria-pressed="draft.entry_mode === 'item'" @click="draft.entry_mode = 'item'">
+              {{ t('ledger.entryModeItem') }}
+            </button>
           </div>
         </fieldset>
 
-        <fieldset v-else-if="wizardStep === 2">
-          <legend>{{ t('ledger.subjectTracking') }}</legend>
-          <label class="switch-row">
-            <input v-model="draft.subject_enabled" type="checkbox" />
-            <span>{{ t('ledger.subjectTracking') }}</span>
-          </label>
-          <select v-model="draft.subject_step_mode" :disabled="!draft.subject_enabled">
-            <option value="required">{{ t('ledger.subjectRequired') }}</option>
-            <option value="optional">{{ t('ledger.subjectOptional') }}</option>
-            <option value="disabled">{{ t('common.disabled') }}</option>
-          </select>
+        <fieldset v-else-if="currentWizardStep === 'receiptDetails'">
+          <legend>{{ t('ledger.receiptItemTracking') }}</legend>
+          <div class="choice-tags two-options">
+            <button type="button" :class="{ selected: draft.receipt_item_enabled }" :aria-pressed="draft.receipt_item_enabled" @click="draft.receipt_item_enabled = true">
+              {{ t('ledger.receiptItemSometimes') }}
+            </button>
+            <button type="button" :class="{ selected: !draft.receipt_item_enabled }" :aria-pressed="!draft.receipt_item_enabled" @click="draft.receipt_item_enabled = false">
+              {{ t('ledger.receiptItemNever') }}
+            </button>
+          </div>
         </fieldset>
 
-        <fieldset v-else-if="wizardStep === 3">
+        <fieldset v-else-if="currentWizardStep === 'subject'">
+          <legend>{{ t('ledger.subjectTracking') }}</legend>
+          <div class="choice-tags">
+            <button type="button" :class="{ selected: draft.subject_enabled && draft.subject_step_mode === 'required' }" @click="setSubjectMode('required')">
+              {{ t('ledger.trackingRequired') }}
+            </button>
+            <button type="button" :class="{ selected: draft.subject_enabled && draft.subject_step_mode === 'optional' }" @click="setSubjectMode('optional')">
+              {{ t('ledger.trackingOptional') }}
+            </button>
+            <button type="button" :class="{ selected: !draft.subject_enabled }" @click="setSubjectMode('disabled')">
+              {{ t('ledger.trackingDisabled') }}
+            </button>
+          </div>
+        </fieldset>
+
+        <fieldset v-else-if="currentWizardStep === 'necessity'">
           <legend>{{ t('ledger.necessityTracking') }}</legend>
+          <div class="choice-tags">
+            <button type="button" :class="{ selected: draft.necessity_step_mode === 'required' }" @click="draft.necessity_step_mode = 'required'">
+              {{ t('ledger.trackingRequired') }}
+            </button>
+            <button type="button" :class="{ selected: draft.necessity_step_mode === 'optional' }" @click="draft.necessity_step_mode = 'optional'">
+              {{ t('ledger.trackingOptional') }}
+            </button>
+            <button type="button" :class="{ selected: draft.necessity_step_mode === 'disabled' }" @click="draft.necessity_step_mode = 'disabled'">
+              {{ t('ledger.trackingDisabled') }}
+            </button>
+          </div>
+        </fieldset>
+
+        <fieldset v-else-if="currentWizardStep === 'location'">
+          <legend>{{ t('ledger.locationTracking') }}</legend>
+          <div class="choice-tags">
+            <button type="button" :class="{ selected: draft.location_step_mode === 'required' }" @click="draft.location_step_mode = 'required'">
+              {{ t('ledger.trackingRequired') }}
+            </button>
+            <button type="button" :class="{ selected: draft.location_step_mode === 'optional' }" @click="draft.location_step_mode = 'optional'">
+              {{ t('ledger.trackingOptional') }}
+            </button>
+            <button type="button" :class="{ selected: draft.location_step_mode === 'disabled' }" @click="draft.location_step_mode = 'disabled'">
+              {{ t('ledger.trackingDisabled') }}
+            </button>
+          </div>
+        </fieldset>
+
+        <fieldset v-else-if="currentWizardStep === 'currency'">
+          <legend>{{ t('ledger.defaultCurrency') }}</legend>
           <label>
-            <span>{{ t('ledger.necessityTracking') }}</span>
-            <select v-model="draft.necessity_step_mode">
-              <option value="required">{{ t('ledger.subjectRequired') }}</option>
-              <option value="optional">{{ t('ledger.subjectOptional') }}</option>
-              <option value="disabled">{{ t('common.disabled') }}</option>
+            <span>{{ t('ledger.defaultCurrency') }}</span>
+            <select v-model="draft.default_currency_code" required>
+              <option v-for="currency in CURRENCY_OPTIONS" :key="currency.code" :value="currency.code">
+                {{ currencyOptionLabel(currency) }}
+              </option>
             </select>
           </label>
           <label class="switch-row">
@@ -72,28 +114,10 @@
           </label>
         </fieldset>
 
-        <fieldset v-else>
-          <legend>{{ t('ledger.defaultCurrency') }}</legend>
-          <div class="grid-two">
-            <label>
-              <span>{{ t('ledger.defaultCurrency') }}</span>
-              <select v-model="draft.default_currency_code" required>
-                <option v-for="currency in CURRENCY_OPTIONS" :key="currency.code" :value="currency.code">
-                  {{ currencyOptionLabel(currency) }}
-                </option>
-              </select>
-            </label>
-            <label>
-              <span>{{ t('ledger.timezone') }}</span>
-              <input v-model.trim="draft.timezone" maxlength="50" required />
-            </label>
-          </div>
-        </fieldset>
-
         <div class="actions">
           <button type="button" @click="closeWizard">{{ t('common.cancel') }}</button>
           <button type="button" :disabled="wizardStep === 0" @click="wizardStep--">{{ t('common.back') }}</button>
-          <button v-if="wizardStep < 4" type="button" :disabled="!canAdvance" @click="wizardStep++">
+          <button v-if="wizardStep < wizardSteps.length - 1" type="button" :disabled="!canAdvance" @click="wizardStep++">
             {{ t('common.next') }}
           </button>
           <button v-else class="primary-button" type="submit" :disabled="isSubmitting || !canAdvance">
@@ -154,6 +178,8 @@ import { CURRENCY_OPTIONS, currencyOptionLabel } from '@/constants/currencies'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoneyWithTrailingSymbol } from '@/utils/money'
 
+type LedgerWizardStep = 'name' | 'entryMode' | 'receiptDetails' | 'subject' | 'necessity' | 'location' | 'currency'
+
 const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
@@ -167,6 +193,8 @@ const errorMessage = ref('')
 const draft = reactive<LedgerCreatePayload>({
   name: '',
   entry_mode: 'receipt',
+  receipt_item_enabled: false,
+  location_step_mode: 'optional',
   subject_enabled: false,
   subject_step_mode: 'required',
   necessity_step_mode: 'disabled',
@@ -175,9 +203,16 @@ const draft = reactive<LedgerCreatePayload>({
   budget_enabled: false,
 })
 
+const wizardSteps = computed<LedgerWizardStep[]>(() => {
+  const steps: LedgerWizardStep[] = ['name', 'entryMode']
+  if (draft.entry_mode === 'receipt') steps.push('receiptDetails')
+  steps.push('subject', 'necessity', 'location', 'currency')
+  return steps
+})
+const currentWizardStep = computed(() => wizardSteps.value[wizardStep.value])
 const canAdvance = computed(() => {
-  if (wizardStep.value === 0) return draft.name.length >= 1 && draft.name.length <= 50
-  if (wizardStep.value === 4) return CURRENCY_OPTIONS.some((currency) => currency.code === draft.default_currency_code) && draft.timezone.length > 0
+  if (currentWizardStep.value === 'name') return draft.name.length >= 1 && draft.name.length <= 50
+  if (currentWizardStep.value === 'currency') return CURRENCY_OPTIONS.some((currency) => currency.code === draft.default_currency_code)
   return true
 })
 
@@ -203,6 +238,11 @@ function modeLabel(mode: EntryMode): string {
   return mode === 'receipt' ? t('ledger.entryModeReceipt') : t('ledger.entryModeItem')
 }
 
+function setSubjectMode(mode: 'required' | 'optional' | 'disabled') {
+  draft.subject_enabled = mode !== 'disabled'
+  draft.subject_step_mode = mode
+}
+
 function ledgerTotalLabel(ledger: Ledger): string {
   const totals = Object.entries(ledger.total_amounts || {})
   if (!totals.length) return `${t('summary.total')} ${formatMoneyWithTrailingSymbol(0, ledger.default_currency_code)}`
@@ -222,6 +262,7 @@ async function submitLedger() {
   errorMessage.value = ''
   try {
     if (!draft.subject_enabled) draft.subject_step_mode = 'disabled'
+    if (draft.entry_mode === 'item') draft.receipt_item_enabled = false
     const ledger = await ledgerStore.addLedger({ ...draft })
     showWizard.value = false
     if (ledger.budget_enabled) {
@@ -339,14 +380,36 @@ button:disabled {
   font-weight: 700;
 }
 
-.segmented,
-.grid-two {
+.choice-tags {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-.segmented label,
+.choice-tags.two-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.choice-tags button {
+  min-height: 72px;
+  border: 2px solid #c9d1dc;
+  padding: 12px;
+  background: #fff;
+  font-weight: 700;
+}
+
+.choice-tags button.selected {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  box-shadow: inset 0 0 0 1px #2563eb;
+}
+
+.choice-tags button:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
 .switch-row {
   display: flex;
   align-items: center;
@@ -429,8 +492,8 @@ button:disabled {
     align-items: center;
   }
 
-  .segmented,
-  .grid-two {
+  .choice-tags,
+  .choice-tags.two-options {
     grid-template-columns: 1fr;
   }
 

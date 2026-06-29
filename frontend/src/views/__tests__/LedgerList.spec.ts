@@ -39,7 +39,59 @@ describe('LedgerList', () => {
     await wrapper.find('.create-icon-button').trigger('click')
 
     expect(wrapper.find('input[maxlength="50"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('1/5')
+    expect(wrapper.text()).toContain('1/7')
+  })
+
+  it('uses separate tag-based setup steps and hides timezone', async () => {
+    const router = makeRouter()
+    router.push('/ledgers')
+    await router.isReady()
+    const wrapper = mount(LedgerList, { global: { plugins: [router] } })
+
+    await wrapper.find('.create-icon-button').trigger('click')
+    await wrapper.find('input[maxlength="50"]').setValue('Home')
+    await clickAction(wrapper, '下一步')
+
+    expect(wrapper.text()).toContain('记录模式')
+    expect(wrapper.text()).not.toContain('偶尔会记录详细')
+    await clickAction(wrapper, '下一步')
+
+    expect(wrapper.text()).toContain('3/7')
+    expect(wrapper.text()).toContain('偶尔会记录详细')
+    expect(wrapper.text()).toContain('不会记录详细')
+    await wrapper.findAll('.choice-tags button').find((button) => button.text() === '偶尔会记录详细')?.trigger('click')
+    await clickAction(wrapper, '下一步')
+
+    expect(wrapper.text()).toContain('记录花费对象')
+    expect(wrapper.findAll('.choice-tags button').map((button) => button.text())).toEqual(['必须记录', '可以跳过', '不会记录'])
+    await clickAction(wrapper, '下一步')
+    expect(wrapper.text()).toContain('记录消费必要性')
+    await clickAction(wrapper, '下一步')
+    expect(wrapper.text()).toContain('记录消费地点')
+    await clickAction(wrapper, '下一步')
+
+    expect(wrapper.text()).toContain('7/7')
+    expect(wrapper.text()).toContain('默认货币')
+    expect(wrapper.text()).not.toContain('时区')
+    expect(wrapper.find('input[maxlength="50"]').exists()).toBe(false)
+  })
+
+  it('omits the receipt-detail setup step for item mode', async () => {
+    const router = makeRouter()
+    router.push('/ledgers')
+    await router.isReady()
+    const wrapper = mount(LedgerList, { global: { plugins: [router] } })
+
+    await wrapper.find('.create-icon-button').trigger('click')
+    await wrapper.find('input[maxlength="50"]').setValue('Items')
+    await clickAction(wrapper, '下一步')
+    await wrapper.findAll('.choice-tags button').find((button) => button.text() === '每种商品一笔')?.trigger('click')
+
+    expect(wrapper.text()).toContain('2/6')
+    await clickAction(wrapper, '下一步')
+    expect(wrapper.text()).toContain('3/6')
+    expect(wrapper.text()).toContain('记录花费对象')
+    expect(wrapper.text()).not.toContain('偶尔会记录详细')
   })
 
   it('renders existing ledgers with settings action', async () => {
@@ -101,3 +153,9 @@ describe('LedgerList', () => {
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('ledger-settings'))
   })
 })
+
+async function clickAction(wrapper: ReturnType<typeof mount>, text: string) {
+  const button = wrapper.findAll('.actions button').find((candidate) => candidate.text() === text)
+  expect(button).toBeTruthy()
+  await button?.trigger('click')
+}

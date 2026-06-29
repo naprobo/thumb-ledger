@@ -161,3 +161,12 @@ async def get_sorted_items(
     counts = await _get_counts(db, ledger_id, user_id, "item", category=category)
     custom_items = [item for item in counts if item not in items]
     return sort_tags_by_preference([*items, *custom_items], counts)
+
+
+async def get_sorted_locations(
+    db: AsyncSession,
+    ledger_id: uuid.UUID,
+    user_id: uuid.UUID,
+) -> list[str]:
+    counts = await _get_counts(db, ledger_id, user_id, "location")
+    return sorted(counts, key=lambda value: (-counts[value], value.casefold()))

@@ -46,6 +46,25 @@ def validate_item_mode_payload(ledger: Ledger, payload: TransactionCreateRequest
         )
 
 
+def validate_location_payload(
+    ledger: Ledger,
+    payload: TransactionCreateRequest | TransactionUpdateRequest,
+    *,
+    creating: bool = False,
+) -> None:
+    if ledger.location_step_mode == "required":
+        if creating and not payload.location_name:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Spending location is required.",
+            )
+        if "location_name" in payload.model_fields_set and not payload.location_name:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Spending location is required.",
+            )
+
+
 def ensure_item_total_matches_transaction(
     amount: int,
     items: Sequence[TransactionItemRequest | TransactionItem],
@@ -155,6 +174,8 @@ async def update_preferences_for_transaction(
             )
     for transaction_subject in transaction.transaction_subjects:
         await increment_count(db, ledger_id, user_id, "subject", transaction_subject.subject.name)
+    if transaction.location_name:
+        await increment_count(db, ledger_id, user_id, "location", transaction.location_name)
 
 
 def transaction_select_with_children() -> Select[tuple[Transaction]]:
@@ -254,6 +275,7 @@ def format_transactions_csv(transactions: Sequence[Transaction], recorded_by_loo
             "currency_code",
             "category",
             "item_name",
+            "location",
             "subject",
             "necessity",
             "note",
@@ -273,6 +295,7 @@ def format_transactions_csv(transactions: Sequence[Transaction], recorded_by_loo
                     "currency_code": item.currency_code,
                     "category": item.category_name_snapshot,
                     "item_name": item.item_name or "",
+                    "location": transaction.location_name or "",
                     "subject": subject,
                     "necessity": transaction.necessity,
                     "note": transaction.note or "",

@@ -15,6 +15,7 @@ export interface TransactionCreatePayload {
   transaction_date?: string
   necessity?: Necessity
   note?: string
+  location_name?: string
   items?: TransactionItemPayload[]
   subject_ids?: string[]
 }
@@ -25,6 +26,7 @@ export interface TransactionUpdatePayload {
   transaction_date?: string
   necessity?: Necessity
   note?: string | null
+  location_name?: string | null
   items?: TransactionItemPayload[]
   subject_ids?: string[]
 }
@@ -38,6 +40,7 @@ export interface Transaction {
   transaction_date: string
   necessity: string
   note: string | null
+  location_name: string | null
   items: Array<{
     id: string
     category_name_snapshot: string

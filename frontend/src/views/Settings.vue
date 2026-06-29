@@ -39,6 +39,20 @@
             </select>
           </label>
 
+          <label v-if="ledger.entry_mode === 'receipt'" class="setting-toggle">
+            <span>{{ t('ledger.receiptItemSetting') }}</span>
+            <input v-model="draft.receipt_item_enabled" type="checkbox" />
+          </label>
+
+          <label>
+            <span>{{ t('ledger.locationTracking') }}</span>
+            <select v-model="draft.location_step_mode">
+              <option value="required">{{ t('ledger.subjectRequired') }}</option>
+              <option value="optional">{{ t('ledger.subjectOptional') }}</option>
+              <option value="disabled">{{ t('common.disabled') }}</option>
+            </select>
+          </label>
+
           <label>
             <span>{{ t('ledger.subjectStepMode') }}</span>
             <select v-model="draft.subject_step_mode">
@@ -197,6 +211,7 @@ import {
   listShareRequests,
   rejectShareRequest,
   type LedgerMember,
+  type LocationStepMode,
   type NecessityStepMode,
   type ShareRequest,
   type SubjectStepMode,
@@ -214,8 +229,10 @@ const ledgerStore = useLedgerStore()
 const ledgerId = computed(() => String(route.params.id))
 const ledger = computed(() => ledgerStore.activeLedger)
 
-const draft = reactive<{ name: string; subject_step_mode: SubjectStepMode; necessity_step_mode: NecessityStepMode; default_currency_code: string }>({
+const draft = reactive<{ name: string; receipt_item_enabled: boolean; location_step_mode: LocationStepMode; subject_step_mode: SubjectStepMode; necessity_step_mode: NecessityStepMode; default_currency_code: string }>({
   name: '',
+  receipt_item_enabled: false,
+  location_step_mode: 'optional',
   subject_step_mode: 'required',
   necessity_step_mode: 'disabled',
   default_currency_code: 'JPY',
@@ -250,6 +267,8 @@ onMounted(async () => {
       return
     }
     draft.name = loaded.name
+    draft.receipt_item_enabled = loaded.receipt_item_enabled ?? false
+    draft.location_step_mode = loaded.location_step_mode ?? 'optional'
     draft.subject_step_mode = loaded.subject_step_mode
     draft.necessity_step_mode = loaded.necessity_step_mode
     draft.default_currency_code = loaded.default_currency_code
@@ -268,6 +287,8 @@ async function saveSettings() {
   try {
     await ledgerStore.saveLedger(ledgerId.value, {
       name: draft.name.trim(),
+      receipt_item_enabled: draft.receipt_item_enabled,
+      location_step_mode: draft.location_step_mode,
       subject_step_mode: draft.subject_step_mode,
       necessity_step_mode: draft.necessity_step_mode,
       default_currency_code: draft.default_currency_code,
@@ -475,6 +496,21 @@ h3 {
   display: grid;
   gap: 6px;
   font-weight: 700;
+}
+
+.setting-toggle {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  gap: 12px;
+}
+
+.setting-toggle input {
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  min-height: 20px;
 }
 
 .save-row {
