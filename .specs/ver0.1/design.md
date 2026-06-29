@@ -154,6 +154,7 @@ sequenceDiagram
 - `GET /ledgers/{id}/preferences/subjects` — 排序后的花费对象列表
 - `GET /ledgers/{id}/preferences/categories` — 排序后的分类列表
 - `GET /ledgers/{id}/preferences/items?category={cat}` — 排序后的商品名建议
+- `GET /ledgers/{id}/preferences/locations` — 当前用户按使用频次排序的消费地点
 
 偏好更新在交易保存时由 Transaction Service 内部调用，对外不暴露写接口。
 
@@ -222,17 +223,19 @@ sequenceDiagram
 
 Wizard Flow 前端交互约束：
 - `WizardStepAmount.vue` 使用应用内自制数字键盘作为金额主输入方式，不渲染原生金额输入框，不依赖浏览器/系统输入法；上方以计算器式显示区展示当前金额和默认货币，OK 键确认后进入下一步。
-- `WizardStepCategory.vue` 默认展示偏好排序后的分类标签。receipt（一张小票一笔）模式在 Amount 后直接进入 Category，选择后跳过 Item name，并将整张小票金额保存到该分类下。
-- `WizardStepItem.vue` 仅在 item（逐商品）模式出现，默认展示偏好排序后的消费名称标签；自定义消费名称通过 `+ 自定义` 标签入口打开文本输入框，避免一进入消费名称步骤就弹出系统键盘。
+- `WizardStepCategory.vue` 默认展示偏好排序后的分类标签。receipt（一张小票一笔）模式选择 Category 后，根据 `receipt_item_enabled` 决定进入可跳过的消费名称步骤或继续下一步。
+- `WizardStepItem.vue` 在 item（逐商品）模式中必填，在启用消费细节的 receipt 模式中可跳过；两种模式均加载同一套分类预置/偏好消费名称，自定义消费名称通过 `+ 自定义` 标签入口打开文本输入框。可跳过时，带警示 icon 的跳过按钮置于标签列表上方。
+- `WizardStepLocation.vue` 位于消费名称之后、必要性之前，显示历史常用地点与 `+ 追加`；追加地点后先回到完整标签列表，不自动选择或前进，用户明确点击新标签后才进入下一步。`location_step_mode=optional` 时在列表上方显示带警示 icon 的跳过按钮，`required` 时必须选择。
 - `WizardFlow.vue` 统一渲染顶部标题栏：Amount 标题为"输入金额"，Amount 左侧返回回到账本主页，后续步骤左侧返回到上一步；完成页标题为"记录成功"且不提供返回动作。
 - `WizardFlow.vue` 在步骤切换和进入完成页时应将当前 Wizard/页面滚动位置重置到顶部，避免上一屏滚动位置影响下一屏。
 - `WizardStepNecessity.vue` 不做默认预选或超时自动保存；"刚需"、"非刚需"、"关闭此步骤"均使用同等级的大块按钮。
 - `LedgerDetail.vue`、Wizard 各步骤及消费记录列表静态文案均必须通过 `vue-i18n` 消息键渲染，测试需防止 `transaction.list`、`transaction.monthTotal` 等裸 key 暴露到 UI。
-- `LedgerDetail.vue` 以月份为单位查询并展示消费记录，本月合计来自当前月日期范围；底部使用上一月/下一月按钮，不显示页码。
+- `LedgerDetail.vue` 以月份为单位查询并展示消费记录，本月合计来自当前月日期范围；月份切换位于账本标题和操作按钮下方，中间显示完整年月，不显示页码或“消费记录 · 年月”外层卡片标题。
 - 已登录全局顶部菜单提供语言切换入口，复用 `AuthStore.updatePreferredLanguage()` 同步本地偏好与后端用户偏好。
 - 已登录全局顶部栏在汉堡菜单左侧显示通知铃铛；未读通知数大于 0 时显示红点，点击进入通知列表。
 - 账本设置页的分享码区域使用只读 code/input 加 copy icon 按钮；复制成功/失败提示使用顶栏下方居中的浮动 toast。
 - 共享成员、共享申请、通知和 Admin 用户列表中的用户显示名统一走 `display_name = nickname || email`。
+- 新建账本向导使用动态步骤：名称 → 记录模式 → 小票消费细节（仅 receipt）→ 花费对象 → 必要性 → 消费地点 → 默认货币。各记录选项独占一屏并使用大块标签按钮；时区保留后端默认值，不在货币步骤显示。
 
 ---
 
@@ -268,6 +271,8 @@ erDiagram
         uuid owner_id FK
         string name
         string entry_mode
+        bool receipt_item_enabled
+        string location_step_mode
         bool subject_enabled
         string subject_step_mode
         string necessity_step_mode
@@ -325,6 +330,7 @@ erDiagram
         date transaction_date
         string necessity
         string note
+        string location_name
         uuid recurring_transaction_id FK
         timestamp created_at
         timestamp updated_at
@@ -464,11 +470,15 @@ erDiagram
 
 **entry_mode**：账本级枚举，`receipt`（一张小票）或 `item`（逐商品）。
 
+**receipt_item_enabled**：仅影响 `receipt` 模式；开启后显示可跳过的消费名称步骤。
+
+**location_step_mode**：`required` | `optional` | `disabled`，默认 `optional`。
+
 **subject_step_mode**：`required` | `optional` | `disabled`
 
 **necessity_step_mode**：`enabled` | `disabled`
 
-**PREFERENCE 表**：`tag_type` = `subject` | `category` | `item`；`category` 字段在 `tag_type=item` 时非空。
+**PREFERENCE 表**：`tag_type` = `subject` | `category` | `item` | `location`；`category` 字段在 `tag_type=item` 时非空。Location 不使用预设多语言键，按当前用户历史输入与频次排序。
 
 **CATEGORY 表**：每个账本包含系统固定分类；`is_system=True` 的默认分类不可删除，`display_order` 用于默认排序和偏好排序 tie-breaker。当前产品不在 UI 中暴露自定义分类入口。
 
