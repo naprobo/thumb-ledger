@@ -100,18 +100,22 @@
             variant="outlined"
             density="comfortable"
           />
-          <v-text-field
+          <v-combobox
             v-model.trim="draft.itemName"
+            :items="itemOptions"
             :label="t('transaction.itemName')"
             :disabled="!canEditSimpleEntry"
             maxlength="100"
+            clearable
             variant="outlined"
             density="comfortable"
           />
-          <v-text-field
+          <v-combobox
             v-model.trim="draft.locationName"
+            :items="locationSuggestions"
             :label="t('transaction.location')"
             maxlength="100"
+            clearable
             variant="outlined"
             density="comfortable"
           />
@@ -158,14 +162,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft } from '@lucide/vue'
 
 import { listCategories, type Category } from '@/api/ledgers'
 import { deleteTransaction, getTransaction, updateTransaction, type Necessity, type Transaction } from '@/api/transactions'
-import { listSubjects, type Subject } from '@/api/preferences'
+import { getPreferredItems, getPreferredLocations, listSubjects, type Subject } from '@/api/preferences'
 import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { translateLabel } from '@/i18n/labels'
 import { useLedgerStore } from '@/stores/ledgers'
@@ -181,6 +185,8 @@ const ledger = computed(() => ledgerStore.activeLedger)
 const transaction = ref<Transaction | null>(null)
 const categories = ref<Category[]>([])
 const subjects = ref<Subject[]>([])
+const itemSuggestions = ref<string[]>([])
+const locationSuggestions = ref<string[]>([])
 const isEditing = ref(false)
 const isInitialLoading = ref(true)
 const isSaving = ref(false)
@@ -191,9 +197,9 @@ const draft = reactive({
   amount: '',
   transactionDate: '',
   category: '',
-  itemName: '',
+  itemName: '' as string | null,
   originalItemName: '',
-  locationName: '',
+  locationName: '' as string | null,
   necessity: 'essential' as Necessity,
   note: '',
   subjectIds: [] as string[],
@@ -203,6 +209,7 @@ const firstItem = computed(() => transaction.value?.items[0])
 const canEditSimpleEntry = computed(() => (transaction.value?.items.length || 0) <= 1)
 const categoryLabel = computed(() => translateLabel(firstItem.value?.category_name_snapshot, t))
 const itemLabel = computed(() => (firstItem.value?.item_name ? translateLabel(firstItem.value.item_name, t) : '-'))
+const itemOptions = computed(() => [...new Set(itemSuggestions.value.map((item) => translateLabel(item, t)))])
 const subjectOptions = computed(() => subjects.value.map((subject) => ({ label: translateLabel(subject.name, t), value: subject.id })))
 const categoryOptions = computed(() => categories.value.map((category) => ({ label: translateLabel(category.name, t), value: category.name })))
 const necessityOptions = computed(() => [
@@ -220,18 +227,27 @@ const subjectLabels = computed(() => {
 onMounted(async () => {
   try {
     await ledgerStore.fetchLedger(ledgerId.value)
-    const [loadedTransaction, loadedCategories, loadedSubjects] = await Promise.all([
+    const [loadedTransaction, loadedCategories, loadedSubjects, loadedLocations] = await Promise.all([
       getTransaction(ledgerId.value, transactionId.value),
       listCategories(ledgerId.value),
       listSubjects(ledgerId.value),
+      getPreferredLocations(ledgerId.value),
     ])
     transaction.value = loadedTransaction
     categories.value = loadedCategories
     subjects.value = loadedSubjects
+    locationSuggestions.value = loadedLocations
   } finally {
     isInitialLoading.value = false
   }
 })
+
+watch(
+  () => draft.category,
+  async (category) => {
+    itemSuggestions.value = category ? await getPreferredItems(ledgerId.value, category) : []
+  },
+)
 
 function startEdit() {
   if (!transaction.value) return
@@ -263,7 +279,7 @@ async function saveEdit() {
       transaction_date: draft.transactionDate,
       necessity: draft.necessity,
       note: draft.note || null,
-      location_name: draft.locationName || null,
+      location_name: draft.locationName?.trim() || null,
       subject_ids: draft.subjectIds,
     }
     if (canEditSimpleEntry.value) {
@@ -290,9 +306,11 @@ async function saveEdit() {
 }
 
 function itemNameForSave(): string | undefined {
-  const trimmed = draft.itemName.trim()
+  const trimmed = draft.itemName?.trim() || ''
   if (!trimmed) return undefined
   if (draft.originalItemName && trimmed === translateLabel(draft.originalItemName, t)) return draft.originalItemName
+  const systemItem = itemSuggestions.value.find((item) => translateLabel(item, t) === trimmed)
+  if (systemItem) return systemItem
   return trimmed
 }
 
