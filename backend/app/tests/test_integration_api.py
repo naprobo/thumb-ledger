@@ -357,6 +357,29 @@ async def test_complete_bookkeeping_flow_creates_and_lists_transaction(client: A
         location_name="Station Market",
     )
 
+    updated = await client.patch(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/transactions/{transaction['id']}",
+        headers=auth_headers(token),
+        json={
+            "amount": 3456,
+            "currency_code": "JPY",
+            "transaction_date": "2026-06-13",
+            "necessity": "essential",
+            "location_name": "Edited Market",
+            "items": [{
+                "category_name": "category.dining",
+                "item_name": "item.restaurant",
+                "amount": 3456,
+                "currency_code": "JPY",
+            }],
+            "subject_ids": [],
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["location_name"] == "Edited Market"
+    assert updated.json()["items"][0]["item_name"] == "item.restaurant"
+    assert updated.json()["updated_at"]
+
     response = await client.get(
         f"{API_PREFIX}/ledgers/{ledger['id']}/transactions",
         headers=auth_headers(token),
@@ -365,7 +388,7 @@ async def test_complete_bookkeeping_flow_creates_and_lists_transaction(client: A
     body = response.json()
     assert body["total"] == 1
     assert body["items"][0]["id"] == transaction["id"]
-    assert body["items"][0]["location_name"] == "Station Market"
+    assert body["items"][0]["location_name"] == "Edited Market"
     assert body["page_total_amounts"] == {"JPY": 3456}
 
     locations = await client.get(
@@ -373,7 +396,7 @@ async def test_complete_bookkeeping_flow_creates_and_lists_transaction(client: A
         headers=auth_headers(token),
     )
     assert locations.status_code == 200
-    assert locations.json()["items"] == ["Station Market"]
+    assert set(locations.json()["items"]) == {"Station Market", "Edited Market"}
 
 
 @pytest.mark.asyncio
