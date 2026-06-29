@@ -1,4 +1,4 @@
-import{B as t}from"./index-C1e-Ua9E.js";/**
+import{B as t}from"./index-DLXi_iA3.js";/**
  * @license @lucide/vue v1.20.0 - ISC
  *
  * This source code is licensed under the ISC license.
