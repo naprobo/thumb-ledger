@@ -113,6 +113,7 @@ vi.mock('@/api/preferences', () => ({
   deleteSubject: vi.fn(),
   getPreferredCategories: vi.fn(async () => ['食物']),
   getPreferredItems: vi.fn(async () => ['米']),
+  getPreferredLocations: vi.fn(async () => []),
   getSubjectPreferenceDetails: vi.fn(async () => [{ value: '自己', selection_count: 1, last_selected_at: '2099-01-01T00:00:00Z' }]),
   listSubjects: vi.fn(async () => [{ id: 'subject-1', name: '自己' }]),
 }))
@@ -152,8 +153,11 @@ describe('LedgerDetail', () => {
 
     expect(wrapper.find('.topbar .record-button').exists()).toBe(true)
     expect(wrapper.find('.budget-panel.soft').exists()).toBe(true)
-    expect(wrapper.text()).toContain('消费记录')
+    expect(wrapper.text()).not.toContain('消费记录 ·')
     expect(wrapper.text()).toContain('本月合计')
+    expect(wrapper.find('.records-section').exists()).toBe(true)
+    expect(wrapper.find('.list-panel').exists()).toBe(false)
+    expect(wrapper.find('.month-nav strong').text()).toMatch(/年.*月/)
     expect(wrapper.find('.section-heading .v-chip').exists()).toBe(false)
     expect(wrapper.find('.month-title').exists()).toBe(false)
     expect(wrapper.text()).toContain('分类金额占比')

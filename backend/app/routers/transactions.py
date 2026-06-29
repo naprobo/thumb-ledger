@@ -40,6 +40,7 @@ from app.services.transaction import (
     transaction_select_with_children,
     update_preferences_for_transaction,
     validate_item_mode_payload,
+    validate_location_payload,
     validate_subjects,
 )
 
@@ -56,6 +57,7 @@ async def create_transaction(
     ledger = await get_ledger_or_404(db, ledger_id)
     await require_write_ledger(db, ledger, current_user)
     validate_item_mode_payload(ledger, payload)
+    validate_location_payload(ledger, payload, creating=True)
     ensure_item_total_matches_transaction(payload.amount, payload.items)
 
     currency_code = payload.currency_code or ledger.default_currency_code
@@ -68,6 +70,7 @@ async def create_transaction(
         transaction_date=payload.transaction_date or date.today(),
         necessity=effective_necessity(ledger.necessity_step_mode, payload.necessity),
         note=payload.note,
+        location_name=payload.location_name,
     )
     transaction.items = await build_transaction_items(db, ledger, payload.items, payload.amount, currency_code)
     subjects = await validate_subjects(db, ledger, payload.subject_ids)
@@ -158,6 +161,7 @@ async def update_transaction(
     ledger = await get_ledger_or_404(db, ledger_id)
     await require_write_ledger(db, ledger, current_user)
     validate_item_mode_payload(ledger, payload)
+    validate_location_payload(ledger, payload)
     transaction = await get_transaction_or_404(db, ledger_id, transaction_id)
 
     if payload.amount is not None:
@@ -170,6 +174,8 @@ async def update_transaction(
         transaction.necessity = effective_necessity(ledger.necessity_step_mode, payload.necessity)
     if "note" in payload.model_fields_set:
         transaction.note = payload.note
+    if "location_name" in payload.model_fields_set:
+        transaction.location_name = payload.location_name
 
     if payload.items is not None:
         transaction.items.clear()
