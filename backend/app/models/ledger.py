@@ -267,6 +267,11 @@ class Subject(Base):
         default=False,
         nullable=False,
     )
+    is_hidden: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
     display_order: Mapped[int] = mapped_column(
         Integer,
         default=0,
@@ -358,6 +363,11 @@ class Category(Base):
         nullable=False,
     )
     is_system: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+    is_hidden: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
         nullable=False,

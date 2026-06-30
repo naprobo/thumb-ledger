@@ -10,6 +10,7 @@ export default {
     next: 'Next',
     refresh: 'Refresh',
     save: 'Save',
+    edit: 'Edit',
     saved: 'Saved',
   },
   nav: {
@@ -119,6 +120,8 @@ export default {
       deleteConfirm: 'Delete this spending record?',
       categoryDetail: 'Item Details',
       noSubjects: 'No subject',
+      renameTag: 'Rename tag',
+      newTagName: 'New name',
       previousPage: 'Previous',
       nextPage: 'Next',
   },

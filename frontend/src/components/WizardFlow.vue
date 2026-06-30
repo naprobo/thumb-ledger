@@ -13,17 +13,28 @@
       </button>
       <span v-else class="title-spacer" aria-hidden="true" />
       <h2>{{ titleText }}</h2>
-      <button
-        v-if="!showDone && currentStep === 'subject'"
-        type="button"
-        class="title-action-button"
-        :aria-label="subjectDeleteMode ? t('common.cancel') : t('admin.delete')"
-        :title="subjectDeleteMode ? t('common.cancel') : t('admin.delete')"
-        @click="subjectDeleteMode = !subjectDeleteMode"
-      >
-        <X v-if="subjectDeleteMode" :size="24" aria-hidden="true" />
-        <Trash2 v-else :size="24" aria-hidden="true" />
-      </button>
+      <div v-if="!showDone && hasManageableTags" class="title-actions">
+        <button
+          type="button"
+          class="title-action-button"
+          :class="{ active: managementMode === 'edit' }"
+          :aria-label="t('common.edit')"
+          :title="t('common.edit')"
+          @click="toggleManagementMode('edit')"
+        >
+          <Pencil :size="22" aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          class="title-action-button"
+          :class="{ active: managementMode === 'delete' }"
+          :aria-label="t('admin.delete')"
+          :title="t('admin.delete')"
+          @click="toggleManagementMode('delete')"
+        >
+          <Trash2 :size="22" aria-hidden="true" />
+        </button>
+      </div>
       <span v-else class="title-spacer" aria-hidden="true" />
     </header>
 
@@ -40,6 +51,7 @@
         v-else-if="currentStep === 'category'"
         :categories="categories"
         :model-value="draft.category"
+        :management-mode="null"
         @select="selectCategory"
       />
       <WizardStepItem
@@ -47,7 +59,10 @@
         :items="items"
         :model-value="draft.itemName"
         :optional="ledger.entry_mode === 'receipt'"
+        :management-mode="managementMode"
         @select="selectItem"
+        @create="createCustomItem"
+        @manage="manageItem"
         @skip="skipItem"
       />
       <WizardStepLocation
@@ -55,8 +70,10 @@
         :locations="locations"
         :model-value="draft.locationName"
         :optional="ledger.location_step_mode !== 'required'"
+        :management-mode="managementMode"
         @select="selectLocation"
         @add="addLocation"
+        @manage="manageLocation"
         @skip="skipLocation"
       />
       <WizardStepNecessity
@@ -71,12 +88,12 @@
         :subjects="subjects"
         :model-value="draft.subjectIds"
         :optional="ledger.subject_step_mode === 'optional'"
-        :delete-mode="subjectDeleteMode"
+        :management-mode="managementMode"
         :custom-limit-reached="customSubjectCount >= 20"
         @toggle="toggleSubject"
         @confirm="confirmSubjects"
         @create="createCustomSubject"
-        @remove="removeSubject"
+        @manage="manageSubject"
         @skip-forever="disableSubjectStep"
       />
 
@@ -84,6 +101,28 @@
         <span class="spinner" aria-hidden="true" />
         <strong>{{ t('transaction.saving') }}</strong>
       </div>
+
+      <v-dialog v-model="renameDialogOpen" max-width="460">
+        <v-card rounded="lg">
+          <v-card-title>{{ t('transaction.renameTag') }}</v-card-title>
+          <v-card-text>
+            <v-text-field
+              v-model.trim="renameValue"
+              :label="t('transaction.newTagName')"
+              maxlength="100"
+              variant="outlined"
+              autofocus
+              hide-details
+              @keyup.enter="confirmRename"
+            />
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="renameDialogOpen = false">{{ t('common.cancel') }}</v-btn>
+            <v-btn color="primary" :disabled="!renameValue" @click="confirmRename">{{ t('common.save') }}</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </template>
 
     <div v-else class="done-panel">
@@ -99,10 +138,24 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronLeft, Trash2, X } from '@lucide/vue'
+import { ChevronLeft, Pencil, Trash2 } from '@lucide/vue'
 
-import type { Ledger } from '@/api/ledgers'
-import { createSubject, deleteSubject, getPreferredCategories, getPreferredItems, getPreferredLocations, getSubjectPreferenceDetails, listSubjects, type Subject } from '@/api/preferences'
+import { listCategories, type Category, type Ledger } from '@/api/ledgers'
+import {
+  createCustomTag,
+  createSubject,
+  deleteCustomTag,
+  deleteSubject,
+  getItemChoices,
+  getLocationChoices,
+  getPreferredCategories,
+  getSubjectPreferenceDetails,
+  listSubjects,
+  updateCustomTag,
+  updateSubject,
+  type Subject,
+  type TagChoice,
+} from '@/api/preferences'
 import { createTransaction, type Necessity } from '@/api/transactions'
 import WizardStepAmount from '@/components/wizard/WizardStepAmount.vue'
 import WizardStepCategory from '@/components/wizard/WizardStepCategory.vue'
@@ -110,21 +163,24 @@ import WizardStepItem from '@/components/wizard/WizardStepItem.vue'
 import WizardStepLocation from '@/components/wizard/WizardStepLocation.vue'
 import WizardStepNecessity from '@/components/wizard/WizardStepNecessity.vue'
 import WizardStepSubject, { type SubjectChoice } from '@/components/wizard/WizardStepSubject.vue'
-import { buildWizardSteps, type WizardDraft } from '@/components/wizard/types'
+import { buildWizardSteps, type TagManagementMode, type WizardDraft } from '@/components/wizard/types'
 
 const props = defineProps<{ ledger: Ledger }>()
 const emit = defineEmits<{ saved: []; done: []; updateLedger: [payload: Partial<Ledger>] }>()
 const { t } = useI18n()
 
-const categories = ref<string[]>([])
-const items = ref<string[]>([])
-const locations = ref<string[]>([])
+const categories = ref<Category[]>([])
+const items = ref<TagChoice[]>([])
+const locations = ref<TagChoice[]>([])
 const subjects = ref<SubjectChoice[]>([])
 const currentIndex = ref(0)
 const isSaving = ref(false)
 const showDone = ref(false)
 const errorMessage = ref('')
-const subjectDeleteMode = ref(false)
+const managementMode = ref<TagManagementMode>(null)
+const renameDialogOpen = ref(false)
+const renameValue = ref('')
+const renameTarget = ref<{ kind: 'item' | 'location' | 'subject'; id: string; name: string } | null>(null)
 const wizardShell = ref<HTMLElement | null>(null)
 const initialTransactionDate = formatDate(new Date())
 const lastTransactionDate = ref(initialTransactionDate)
@@ -134,6 +190,12 @@ const steps = computed(() => buildWizardSteps(props.ledger))
 const currentStep = computed(() => steps.value[currentIndex.value])
 const isFinalStep = computed(() => currentIndex.value >= steps.value.length - 1)
 const customSubjectCount = computed(() => subjects.value.filter((subject) => !subject.is_preset).length)
+const hasManageableTags = computed(() => {
+  if (currentStep.value === 'item') return items.value.some((item) => !item.is_system && !!item.id)
+  if (currentStep.value === 'location') return locations.value.some((location) => !!location.id)
+  if (currentStep.value === 'subject') return subjects.value.some((subject) => !subject.is_preset)
+  return false
+})
 const titleText = computed(() => {
   if (showDone.value) return t('transaction.saved')
   switch (currentStep.value) {
@@ -171,12 +233,13 @@ watch(
   () => draft.category,
   async (category) => {
     if (category && (props.ledger.entry_mode === 'item' || props.ledger.receipt_item_enabled)) {
-      items.value = await getPreferredItems(props.ledger.id, category)
+      items.value = await getItemChoices(props.ledger.id, category)
     }
   },
 )
 
 watch([currentIndex, showDone], async () => {
+  managementMode.value = null
   await resetWizardScroll()
 })
 
@@ -187,7 +250,9 @@ function defaultDraft(): WizardDraft {
     transactionDate: lastTransactionDate.value,
     category: '',
     itemName: '',
+    itemTagId: null,
     locationName: '',
+    locationTagId: null,
     necessity: null,
     subjectName: '',
     subjectIds: [],
@@ -196,11 +261,14 @@ function defaultDraft(): WizardDraft {
 }
 
 async function loadPreferences() {
-  const [preferredCategories, preferredLocations] = await Promise.all([
+  const [preferredCategories, categoryRows, preferredLocations] = await Promise.all([
     getPreferredCategories(props.ledger.id),
-    getPreferredLocations(props.ledger.id),
+    listCategories(props.ledger.id),
+    getLocationChoices(props.ledger.id),
   ])
   categories.value = preferredCategories
+    .map((name) => categoryRows.find((category) => category.name === name))
+    .filter((category): category is Category => !!category)
   locations.value = preferredLocations
   const preferredSubjects = await getSubjectPreferenceDetails(props.ledger.id)
   const subjectRows = await listSubjects(props.ledger.id)
@@ -237,29 +305,32 @@ async function selectCategory(category: string) {
   await advanceOrSave()
 }
 
-async function selectItem(item: string) {
-  draft.itemName = item
-  if (item.trim()) await advanceOrSave()
+async function selectItem(item: TagChoice) {
+  draft.itemName = item.value
+  draft.itemTagId = item.id
+  if (item.value.trim()) await advanceOrSave()
 }
 
 async function skipItem() {
   draft.itemName = ''
+  draft.itemTagId = null
   await advanceOrSave()
 }
 
-async function selectLocation(location: string) {
-  draft.locationName = location
+async function selectLocation(location: TagChoice) {
+  draft.locationName = location.value
+  draft.locationTagId = location.id
   await advanceOrSave()
 }
 
-function addLocation(location: string) {
-  if (!locations.value.includes(location)) {
-    locations.value = [...locations.value, location]
-  }
+async function addLocation(location: string) {
+  await createCustomTag(props.ledger.id, { tag_type: 'location', name: location })
+  locations.value = await getLocationChoices(props.ledger.id)
 }
 
 async function skipLocation() {
   draft.locationName = ''
+  draft.locationTagId = null
   await advanceOrSave()
 }
 
@@ -284,14 +355,92 @@ async function confirmSubjects() {
 async function createCustomSubject(name: string) {
   if (!name.trim() || customSubjectCount.value >= 20) return
   const subject = await createSubject(props.ledger.id, name.trim())
-  subjects.value = [...subjects.value, subject]
-  draft.subjectIds = [...draft.subjectIds, subject.id]
+  subjects.value = [...subjects.value.filter((item) => item.id !== subject.id), subject]
+  if (!draft.subjectIds.includes(subject.id)) draft.subjectIds = [...draft.subjectIds, subject.id]
 }
 
-async function removeSubject(subject: Subject) {
-  await deleteSubject(props.ledger.id, subject.id)
-  draft.subjectIds = draft.subjectIds.filter((subjectId) => subjectId !== subject.id)
-  subjects.value = subjects.value.filter((item) => item.id !== subject.id)
+async function createCustomItem(name: string) {
+  const tag = await createCustomTag(props.ledger.id, {
+    tag_type: 'item',
+    name,
+    category: draft.category,
+  })
+  items.value = await getItemChoices(props.ledger.id, draft.category)
+  const choice = items.value.find((item) => item.id === tag.id)
+  if (choice) await selectItem(choice)
+}
+
+function toggleManagementMode(mode: Exclude<TagManagementMode, null>) {
+  managementMode.value = managementMode.value === mode ? null : mode
+}
+
+async function manageItem(item: TagChoice) {
+  if (item.is_system || !item.id) return
+  await manageTag({ kind: 'item', id: item.id, name: item.value })
+}
+
+async function manageLocation(location: TagChoice) {
+  if (!location.id) return
+  await manageTag({ kind: 'location', id: location.id, name: location.value })
+}
+
+async function manageSubject(subject: Subject) {
+  if (subject.is_preset) return
+  await manageTag({ kind: 'subject', id: subject.id, name: subject.name })
+}
+
+async function manageTag(target: NonNullable<typeof renameTarget.value>) {
+  if (managementMode.value === 'edit') {
+    renameTarget.value = target
+    renameValue.value = target.name
+    renameDialogOpen.value = true
+    return
+  }
+  if (managementMode.value !== 'delete') return
+  if (target.kind === 'subject') {
+    await deleteSubject(props.ledger.id, target.id)
+    subjects.value = subjects.value.filter((subject) => subject.id !== target.id)
+    draft.subjectIds = draft.subjectIds.filter((subjectId) => subjectId !== target.id)
+  } else {
+    await deleteCustomTag(props.ledger.id, target.id)
+    if (target.kind === 'item') {
+      items.value = items.value.filter((item) => item.id !== target.id)
+      if (draft.itemTagId === target.id) {
+        draft.itemName = ''
+        draft.itemTagId = null
+      }
+    } else {
+      locations.value = locations.value.filter((location) => location.id !== target.id)
+      if (draft.locationTagId === target.id) {
+        draft.locationName = ''
+        draft.locationTagId = null
+      }
+    }
+  }
+  if (!hasManageableTags.value) managementMode.value = null
+}
+
+async function confirmRename() {
+  const target = renameTarget.value
+  const name = renameValue.value.trim()
+  if (!target || !name) return
+  if (target.kind === 'subject') {
+    const updated = await updateSubject(props.ledger.id, target.id, name)
+    subjects.value = subjects.value.map((subject) => (subject.id === target.id ? { ...subject, ...updated } : subject))
+  } else {
+    const updated = await updateCustomTag(props.ledger.id, target.id, name)
+    if (target.kind === 'item') {
+      items.value = items.value.map((item) => (item.id === target.id ? { ...item, value: updated.name } : item))
+      if (draft.itemTagId === target.id) draft.itemName = updated.name
+    } else {
+      locations.value = locations.value.map((location) => (
+        location.id === target.id ? { ...location, value: updated.name } : location
+      ))
+      if (draft.locationTagId === target.id) draft.locationName = updated.name
+    }
+  }
+  renameDialogOpen.value = false
+  renameTarget.value = null
 }
 
 function next() {
@@ -343,6 +492,7 @@ async function save() {
           {
             category_name: draft.category,
             item_name: draft.itemName || undefined,
+            item_tag_id: draft.itemTagId || undefined,
             amount: draft.amount,
             currency_code: draft.currencyCode,
           },
@@ -355,6 +505,7 @@ async function save() {
       necessity: props.ledger.necessity_step_mode !== 'disabled' ? draft.necessity || 'essential' : 'essential',
       note: draft.note || undefined,
       location_name: draft.locationName || undefined,
+      location_tag_id: draft.locationTagId || undefined,
       items,
       subject_ids: draft.subjectIds,
     }
@@ -378,7 +529,9 @@ function reset() {
   Object.assign(draft, defaultDraft())
   currentIndex.value = 0
   errorMessage.value = ''
-  subjectDeleteMode.value = false
+  managementMode.value = null
+  renameDialogOpen.value = false
+  renameTarget.value = null
 }
 
 function formatDate(value: Date): string {
@@ -430,13 +583,13 @@ async function resetWizardScroll() {
 
 .wizard-titlebar,
 .done-panel {
-  display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
 }
 
 .wizard-titlebar {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 96px;
   min-height: 48px;
 }
 
@@ -452,7 +605,6 @@ async function resetWizardScroll() {
 }
 
 .back-button,
-.title-spacer,
 .title-action-button {
   width: 48px;
   min-width: 48px;
@@ -472,6 +624,18 @@ async function resetWizardScroll() {
 
 .title-spacer {
   display: block;
+  width: 96px;
+}
+
+.title-actions {
+  display: flex;
+  justify-content: flex-end;
+  width: 96px;
+}
+
+.title-action-button.active {
+  background: #e0e7ff;
+  color: #1d4ed8;
 }
 
 .done-panel {

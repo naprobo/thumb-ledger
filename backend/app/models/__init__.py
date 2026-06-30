@@ -14,7 +14,7 @@ from app.models.transaction import (  # noqa: F401
 )
 from app.models.recurring import RecurringTransaction  # noqa: F401
 from app.models.budget import Budget, BudgetCategory  # noqa: F401
-from app.models.preference import Preference  # noqa: F401
+from app.models.preference import CustomTag, Preference  # noqa: F401
 from app.models.audit_log import AuditLog  # noqa: F401
 from app.models.notification import Notification  # noqa: F401
 from app.models.suggestion import Suggestion, SuggestionVote  # noqa: F401
@@ -38,6 +38,7 @@ __all__ = [
     "Budget",
     "BudgetCategory",
     "Preference",
+    "CustomTag",
     "AuditLog",
     "Notification",
     "Suggestion",

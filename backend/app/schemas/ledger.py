@@ -74,11 +74,16 @@ class SubjectCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
 
 
+class SubjectUpdateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=50)
+
+
 class SubjectResponse(BaseModel):
     id: uuid.UUID
     ledger_id: uuid.UUID
     name: str
     is_preset: bool
+    is_hidden: bool
     display_order: int
     created_at: datetime
 
@@ -98,6 +103,7 @@ class CategoryResponse(BaseModel):
     ledger_id: uuid.UUID
     name: str
     is_system: bool
+    is_hidden: bool
     display_order: int
     created_at: datetime
     updated_at: datetime

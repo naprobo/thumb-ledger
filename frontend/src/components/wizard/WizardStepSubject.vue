@@ -12,15 +12,17 @@
         size="large"
         rounded="lg"
         block
-        @click="deleteMode ? $emit('remove', subject) : $emit('toggle', subject)"
+        :disabled="managementMode !== null && subject.is_preset"
+        @click="managementMode ? $emit('manage', subject) : $emit('toggle', subject)"
       >
         {{ translateLabel(subject.name, t) }}
-        <span v-if="deleteMode" class="delete-overlay" aria-hidden="true">
-          <Trash2 :size="24" />
+        <span v-if="managementMode && !subject.is_preset" class="delete-overlay" aria-hidden="true">
+          <Pencil v-if="managementMode === 'edit'" :size="24" />
+          <Trash2 v-else :size="24" />
         </span>
       </v-btn>
     </div>
-    <v-btn class="primary-button subject-confirm" color="success" size="large" rounded="lg" :disabled="!optional && modelValue.length === 0" @click="$emit('confirm')">
+    <v-btn v-if="!managementMode" class="primary-button subject-confirm" color="success" size="large" rounded="lg" :disabled="!optional && modelValue.length === 0" @click="$emit('confirm')">
       OK
     </v-btn>
     <div class="chip-grid">
@@ -34,15 +36,17 @@
         size="large"
         rounded="lg"
         block
-        @click="deleteMode ? $emit('remove', subject) : $emit('toggle', subject)"
+        :disabled="managementMode !== null && subject.is_preset"
+        @click="managementMode ? $emit('manage', subject) : $emit('toggle', subject)"
       >
         {{ translateLabel(subject.name, t) }}
-        <span v-if="deleteMode" class="delete-overlay" aria-hidden="true">
-          <Trash2 :size="24" />
+        <span v-if="managementMode && !subject.is_preset" class="delete-overlay" aria-hidden="true">
+          <Pencil v-if="managementMode === 'edit'" :size="24" />
+          <Trash2 v-else :size="24" />
         </span>
       </v-btn>
       <v-btn
-        v-if="!deleteMode"
+        v-if="!managementMode"
         class="choice-button add-chip"
         :disabled="customLimitReached"
         :class="{ selected: isCustomOpen }"
@@ -57,7 +61,7 @@
         <span>{{ t('transaction.customSubject') }}</span>
       </v-btn>
     </div>
-    <div v-if="isCustomOpen && !deleteMode" class="custom-subject-field">
+    <div v-if="isCustomOpen && !managementMode" class="custom-subject-field">
       <v-text-field
         ref="customInput"
         v-model.trim="customValue"
@@ -74,7 +78,7 @@
         OK
       </v-btn>
     </div>
-    <v-btn v-if="optional" class="ghost-button" variant="text" size="large" @click="$emit('skipForever')">
+    <v-btn v-if="optional && !managementMode" class="ghost-button" variant="text" size="large" @click="$emit('skipForever')">
       {{ t('transaction.skipDontAsk') }}
     </v-btn>
   </section>
@@ -83,9 +87,10 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Plus, Trash2 } from '@lucide/vue'
+import { Pencil, Plus, Trash2 } from '@lucide/vue'
 import type { Subject } from '@/api/preferences'
 import { translateLabel } from '@/i18n/labels'
+import type { TagManagementMode } from '@/components/wizard/types'
 
 export interface SubjectChoice extends Subject {
   selection_count?: number
@@ -94,8 +99,8 @@ export interface SubjectChoice extends Subject {
 
 const RECENT_USAGE_DAYS = 180
 
-const props = defineProps<{ subjects: SubjectChoice[]; modelValue: string[]; optional: boolean; deleteMode: boolean; customLimitReached: boolean }>()
-const emit = defineEmits<{ toggle: [subject: Subject]; confirm: []; create: [name: string]; remove: [subject: Subject]; skipForever: [] }>()
+const props = defineProps<{ subjects: SubjectChoice[]; modelValue: string[]; optional: boolean; managementMode: TagManagementMode; customLimitReached: boolean }>()
+const emit = defineEmits<{ toggle: [subject: Subject]; confirm: []; create: [name: string]; manage: [subject: Subject]; skipForever: [] }>()
 const { t } = useI18n()
 const isCustomOpen = ref(false)
 const customValue = ref('')

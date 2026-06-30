@@ -17,6 +17,7 @@ class TransactionItemRequest(BaseModel):
     category_id: Optional[uuid.UUID] = None
     category_name: Optional[str] = Field(None, min_length=1, max_length=50)
     item_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    item_tag_id: Optional[uuid.UUID] = None
     amount: int = Field(..., strict=True, gt=0)
     currency_code: Optional[str] = Field(None, min_length=3, max_length=3, pattern=r"^[A-Z]{3}$")
 
@@ -33,6 +34,7 @@ class TransactionCreateRequest(BaseModel):
     necessity: Necessity = "essential"
     note: Optional[str] = Field(None, max_length=500)
     location_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    location_tag_id: Optional[uuid.UUID] = None
     items: list[TransactionItemRequest] = Field(default_factory=list, max_length=100)
     subject_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
 
@@ -56,6 +58,7 @@ class TransactionUpdateRequest(BaseModel):
     necessity: Optional[Necessity] = None
     note: Optional[str] = Field(None, max_length=500)
     location_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    location_tag_id: Optional[uuid.UUID] = None
     items: Optional[list[TransactionItemRequest]] = Field(None, max_length=100)
     subject_ids: Optional[list[uuid.UUID]] = Field(None, max_length=20)
 
@@ -70,6 +73,7 @@ class TransactionItemResponse(BaseModel):
     category_id: Optional[uuid.UUID]
     category_name_snapshot: str
     item_name: Optional[str]
+    item_tag_id: Optional[uuid.UUID]
     amount: int
     currency_code: str
 
@@ -78,6 +82,7 @@ class TransactionItemResponse(BaseModel):
 
 class TransactionSubjectResponse(BaseModel):
     subject_id: uuid.UUID
+    name: str
 
     model_config = {"from_attributes": True}
 
@@ -93,6 +98,7 @@ class TransactionResponse(BaseModel):
     necessity: str
     note: Optional[str]
     location_name: Optional[str]
+    location_tag_id: Optional[uuid.UUID]
     created_at: datetime
     updated_at: datetime
     items: list[TransactionItemResponse] = []

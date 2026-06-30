@@ -39,6 +39,7 @@ from app.services.transaction import (
     resolve_date_range,
     transaction_select_with_children,
     update_preferences_for_transaction,
+    validate_custom_tag,
     validate_item_mode_payload,
     validate_location_payload,
     validate_subjects,
@@ -61,6 +62,11 @@ async def create_transaction(
     ensure_item_total_matches_transaction(payload.amount, payload.items)
 
     currency_code = payload.currency_code or ledger.default_currency_code
+    location_tag = (
+        await validate_custom_tag(db, ledger_id, payload.location_tag_id, "location")
+        if payload.location_tag_id
+        else None
+    )
     transaction = Transaction(
         ledger_id=ledger_id,
         recorded_by=current_user.id,
@@ -70,7 +76,8 @@ async def create_transaction(
         transaction_date=payload.transaction_date or date.today(),
         necessity=effective_necessity(ledger.necessity_step_mode, payload.necessity),
         note=payload.note,
-        location_name=payload.location_name,
+        location_name=location_tag.name if location_tag else payload.location_name,
+        location_tag_id=location_tag.id if location_tag else None,
     )
     transaction.items = await build_transaction_items(db, ledger, payload.items, payload.amount, currency_code)
     subjects = await validate_subjects(db, ledger, payload.subject_ids)
@@ -174,8 +181,16 @@ async def update_transaction(
         transaction.necessity = effective_necessity(ledger.necessity_step_mode, payload.necessity)
     if "note" in payload.model_fields_set:
         transaction.note = payload.note
-    if "location_name" in payload.model_fields_set:
+    if "location_tag_id" in payload.model_fields_set:
+        if payload.location_tag_id is None:
+            transaction.location_tag_id = None
+        else:
+            location_tag = await validate_custom_tag(db, ledger_id, payload.location_tag_id, "location")
+            transaction.location_tag_id = location_tag.id
+            transaction.location_name = location_tag.name
+    if "location_name" in payload.model_fields_set and payload.location_tag_id is None:
         transaction.location_name = payload.location_name
+        transaction.location_tag_id = None
 
     if payload.items is not None:
         transaction.items.clear()
