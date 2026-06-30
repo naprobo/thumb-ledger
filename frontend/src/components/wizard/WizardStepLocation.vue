@@ -1,26 +1,31 @@
 <template>
   <section class="wizard-step">
     <h2>{{ t('transaction.location') }}</h2>
-    <v-btn v-if="optional" class="skip-button" color="warning" variant="tonal" size="large" block @click="$emit('skip')">
+    <v-btn v-if="optional && !managementMode" class="skip-button" color="warning" variant="tonal" size="large" block @click="$emit('skip')">
       <AlertTriangle :size="20" aria-hidden="true" />
       <span>{{ t('transaction.skip') }}</span>
     </v-btn>
     <div class="chip-grid">
       <v-btn
         v-for="location in locations"
-        :key="location"
+        :key="location.id || location.value"
         class="choice-button"
-        :class="{ selected: location === modelValue }"
-        :color="location === modelValue ? 'primary' : undefined"
-        :variant="location === modelValue ? 'tonal' : 'outlined'"
+        :class="{ selected: location.value === modelValue, 'managed-chip': managementMode }"
+        :color="location.value === modelValue ? 'primary' : undefined"
+        :variant="location.value === modelValue ? 'tonal' : 'outlined'"
         size="large"
         rounded="lg"
         block
-        @click="$emit('select', location)"
+        @click="managementMode ? $emit('manage', location) : $emit('select', location)"
       >
-        {{ location }}
+        {{ location.value }}
+        <span v-if="managementMode" class="manage-overlay" aria-hidden="true">
+          <Pencil v-if="managementMode === 'edit'" :size="24" />
+          <Trash2 v-else :size="24" />
+        </span>
       </v-btn>
       <v-btn
+        v-if="!managementMode"
         class="choice-button add-chip"
         :class="{ selected: isAddOpen }"
         :color="isAddOpen ? 'primary' : undefined"
@@ -56,12 +61,14 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertTriangle, Plus } from '@lucide/vue'
+import { AlertTriangle, Pencil, Plus, Trash2 } from '@lucide/vue'
+import type { TagChoice } from '@/api/preferences'
+import type { TagManagementMode } from '@/components/wizard/types'
 
-withDefaults(defineProps<{ locations: string[]; modelValue: string; optional?: boolean }>(), {
+withDefaults(defineProps<{ locations: TagChoice[]; modelValue: string; optional?: boolean; managementMode: TagManagementMode }>(), {
   optional: true,
 })
-const emit = defineEmits<{ select: [location: string]; add: [location: string]; skip: [] }>()
+const emit = defineEmits<{ select: [location: TagChoice]; add: [location: string]; manage: [location: TagChoice]; skip: [] }>()
 const { t } = useI18n()
 const isAddOpen = ref(false)
 const locationValue = ref('')
@@ -109,5 +116,19 @@ function confirmAdd() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.managed-chip {
+  position: relative;
+  overflow: hidden;
+}
+
+.manage-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(30 41 59 / 72%);
+  color: #fff;
 }
 </style>

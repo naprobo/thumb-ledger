@@ -12,6 +12,7 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.ledger import Category, Ledger, Subject
+    from app.models.preference import CustomTag
     from app.models.user import User
     from app.models.recurring import RecurringTransaction
 
@@ -66,6 +67,11 @@ class Transaction(Base):
         String(100),
         nullable=True,
     )
+    location_tag_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("custom_tags.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     recurring_transaction_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         ForeignKey("recurring_transactions.id", ondelete="SET NULL"),
         nullable=True,
@@ -113,6 +119,10 @@ class Transaction(Base):
         back_populates="transaction",
         cascade="all, delete-orphan",
     )
+    location_tag: Mapped[Optional["CustomTag"]] = relationship(
+        "CustomTag",
+        foreign_keys=[location_tag_id],
+    )
 
 
 class TransactionItem(Base):
@@ -142,6 +152,11 @@ class TransactionItem(Base):
         String(100),
         nullable=True,
     )
+    item_tag_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("custom_tags.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     amount: Mapped[int] = mapped_column(
         BigInteger,
         nullable=False,
@@ -158,6 +173,10 @@ class TransactionItem(Base):
     )
     category: Mapped[Optional["Category"]] = relationship(
         "Category",
+    )
+    item_tag: Mapped[Optional["CustomTag"]] = relationship(
+        "CustomTag",
+        foreign_keys=[item_tag_id],
     )
 
 
@@ -187,6 +206,10 @@ class TransactionSubject(Base):
         "Subject",
         back_populates="transaction_subjects",
     )
+
+    @property
+    def name(self) -> str:
+        return self.subject.name
 
 
 class TransactionImage(Base):

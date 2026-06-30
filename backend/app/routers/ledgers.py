@@ -4,12 +4,14 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.ledger import Category, HiddenSubject, Ledger, LedgerMember, ShareRequest, Subject
-from app.models.transaction import Transaction
+from app.models.budget import Budget, BudgetCategory
+from app.models.ledger import Category, Ledger, LedgerMember, ShareRequest, Subject
+from app.models.preference import CustomTag, Preference
+from app.models.transaction import Transaction, TransactionItem
 from app.models.user import User
 from app.schemas.ledger import (
     CategoryCreateRequest,
@@ -25,6 +27,7 @@ from app.schemas.ledger import (
     ShareRequestResponse,
     SubjectCreateRequest,
     SubjectResponse,
+    SubjectUpdateRequest,
 )
 from app.services.audit import (
     LEDGER_SHARE_APPROVED,
@@ -189,13 +192,9 @@ async def list_subjects(
 ) -> list[Subject]:
     ledger = await get_ledger_or_404(db, ledger_id)
     await require_read_ledger(db, ledger, current_user)
-    hidden_subjects = select(HiddenSubject.subject_id).where(
-        HiddenSubject.ledger_id == ledger_id,
-        HiddenSubject.user_id == current_user.id,
-    )
     result = await db.execute(
         select(Subject)
-        .where(Subject.ledger_id == ledger_id, ~Subject.id.in_(hidden_subjects))
+        .where(Subject.ledger_id == ledger_id, Subject.is_hidden.is_(False))
         .order_by(Subject.display_order.asc())
     )
     return list(result.scalars().all())
@@ -210,6 +209,17 @@ async def create_subject(
 ) -> Subject:
     ledger = await get_ledger_or_404(db, ledger_id)
     await require_write_ledger(db, ledger, current_user)
+    existing = await db.scalar(
+        select(Subject).where(
+            Subject.ledger_id == ledger_id,
+            Subject.is_preset.is_(False),
+            func.lower(Subject.name) == payload.name.casefold(),
+        )
+    )
+    if existing is not None:
+        existing.is_hidden = False
+        await db.flush()
+        return existing
     count = await db.scalar(
         select(func.count()).select_from(Subject).where(Subject.ledger_id == ledger_id, Subject.is_preset.is_(False))
     )
@@ -220,6 +230,45 @@ async def create_subject(
     max_order = await db.scalar(select(func.max(Subject.display_order)).where(Subject.ledger_id == ledger_id))
     subject = Subject(ledger_id=ledger_id, name=payload.name, is_preset=False, display_order=(max_order or 0) + 1)
     db.add(subject)
+    await db.flush()
+    return subject
+
+
+@router.patch("/{ledger_id}/subjects/{subject_id}", response_model=SubjectResponse)
+async def update_subject(
+    ledger_id: uuid.UUID,
+    subject_id: uuid.UUID,
+    payload: SubjectUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Subject:
+    ledger = await get_ledger_or_404(db, ledger_id)
+    await require_write_ledger(db, ledger, current_user)
+    subject = await db.scalar(select(Subject).where(Subject.id == subject_id, Subject.ledger_id == ledger_id))
+    if subject is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
+    if subject.is_preset:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Preset subject cannot be renamed")
+    duplicate = await db.scalar(
+        select(Subject).where(
+            Subject.ledger_id == ledger_id,
+            Subject.id != subject.id,
+            func.lower(Subject.name) == payload.name.casefold(),
+        )
+    )
+    if duplicate is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Subject name already exists")
+    old_name = subject.name
+    subject.name = payload.name.strip()
+    await db.execute(
+        update(Preference)
+        .where(
+            Preference.ledger_id == ledger_id,
+            Preference.tag_type == "subject",
+            Preference.tag_value == old_name,
+        )
+        .values(tag_value=subject.name)
+    )
     await db.flush()
     return subject
 
@@ -236,21 +285,11 @@ async def delete_subject(
     subject = await db.scalar(select(Subject).where(Subject.id == subject_id, Subject.ledger_id == ledger_id))
     if subject is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subject not found")
-    if not can_modify_preset_subject(subject.is_preset):
-        hidden = await db.scalar(
-            select(HiddenSubject).where(
-                HiddenSubject.ledger_id == ledger_id,
-                HiddenSubject.user_id == current_user.id,
-                HiddenSubject.subject_id == subject_id,
-            )
-        )
-        if hidden is None:
-            db.add(HiddenSubject(ledger_id=ledger_id, user_id=current_user.id, subject_id=subject_id))
-            await db.flush()
-        return {"detail": "Subject hidden successfully."}
-    await db.delete(subject)
+    if subject.is_preset:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Preset subject cannot be hidden")
+    subject.is_hidden = True
     await db.flush()
-    return {"detail": "Subject deleted successfully."}
+    return {"detail": "Subject hidden successfully."}
 
 
 @router.get("/{ledger_id}/categories", response_model=list[CategoryResponse])
@@ -262,7 +301,9 @@ async def list_categories(
     ledger = await get_ledger_or_404(db, ledger_id)
     await require_read_ledger(db, ledger, current_user)
     result = await db.execute(
-        select(Category).where(Category.ledger_id == ledger_id).order_by(Category.display_order.asc())
+        select(Category)
+        .where(Category.ledger_id == ledger_id, Category.is_hidden.is_(False))
+        .order_by(Category.display_order.asc())
     )
     return list(result.scalars().all())
 
@@ -276,6 +317,17 @@ async def create_category(
 ) -> Category:
     ledger = await get_ledger_or_404(db, ledger_id)
     await require_write_ledger(db, ledger, current_user)
+    existing = await db.scalar(
+        select(Category).where(
+            Category.ledger_id == ledger_id,
+            Category.is_system.is_(False),
+            func.lower(Category.name) == payload.name.casefold(),
+        )
+    )
+    if existing is not None:
+        existing.is_hidden = False
+        await db.flush()
+        return existing
     result = await db.execute(select(Category).where(Category.ledger_id == ledger_id))
     display_order = len(result.scalars().all())
     category = Category(
@@ -304,7 +356,59 @@ async def update_category(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
     if not can_modify_system_category(category.is_system):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System category cannot be renamed")
-    category.name = payload.name
+    duplicate = await db.scalar(
+        select(Category).where(
+            Category.ledger_id == ledger_id,
+            Category.id != category.id,
+            func.lower(Category.name) == payload.name.casefold(),
+        )
+    )
+    if duplicate is not None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Category name already exists")
+    old_name = category.name
+    category.name = payload.name.strip()
+    transaction_ids = select(Transaction.id).where(Transaction.ledger_id == ledger_id)
+    await db.execute(
+        update(TransactionItem)
+        .where(
+            TransactionItem.transaction_id.in_(transaction_ids),
+            TransactionItem.category_name_snapshot == old_name,
+        )
+        .values(category_name_snapshot=category.name)
+    )
+    await db.execute(
+        update(Preference)
+        .where(
+            Preference.ledger_id == ledger_id,
+            Preference.tag_type == "category",
+            Preference.tag_value == old_name,
+        )
+        .values(tag_value=category.name)
+    )
+    await db.execute(
+        update(Preference)
+        .where(
+            Preference.ledger_id == ledger_id,
+            Preference.tag_type == "item",
+            Preference.category == old_name,
+        )
+        .values(category=category.name)
+    )
+    await db.execute(
+        update(CustomTag)
+        .where(
+            CustomTag.ledger_id == ledger_id,
+            CustomTag.tag_type == "item",
+            CustomTag.scope == old_name,
+        )
+        .values(scope=category.name)
+    )
+    budget_ids = select(Budget.id).where(Budget.ledger_id == ledger_id)
+    await db.execute(
+        update(BudgetCategory)
+        .where(BudgetCategory.budget_id.in_(budget_ids), BudgetCategory.category == old_name)
+        .values(category=category.name)
+    )
     await db.flush()
     return category
 
@@ -323,8 +427,9 @@ async def delete_category(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
     if not can_modify_system_category(category.is_system):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="System category cannot be deleted")
-    await db.delete(category)
-    return {"detail": "Category deleted successfully."}
+    category.is_hidden = True
+    await db.flush()
+    return {"detail": "Category hidden successfully."}
 
 
 @router.get("/{ledger_id}/share-code", response_model=ShareCodeResponse)

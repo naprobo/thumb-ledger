@@ -2,6 +2,7 @@ import type { Ledger } from '@/api/ledgers'
 import type { Necessity } from '@/api/transactions'
 
 export type WizardStepId = 'amount' | 'category' | 'item' | 'location' | 'necessity' | 'subject'
+export type TagManagementMode = 'edit' | 'delete' | null
 
 export interface WizardDraft {
   amount: number | null
@@ -9,7 +10,9 @@ export interface WizardDraft {
   transactionDate: string
   category: string
   itemName: string
+  itemTagId: string | null
   locationName: string
+  locationTagId: string | null
   necessity: Necessity | null
   subjectName: string
   subjectIds: string[]

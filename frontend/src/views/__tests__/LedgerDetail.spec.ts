@@ -35,6 +35,11 @@ vi.mock('@/api/ledgers', () => ({
     updated_at: '',
     ...payload,
   })),
+  listCategories: vi.fn(async () => [
+    { id: 'category-1', ledger_id: 'ledger-1', name: 'category.food', is_system: true, display_order: 0 },
+  ]),
+  deleteCategory: vi.fn(),
+  updateCategory: vi.fn(),
 }))
 
 vi.mock('@/api/transactions', () => ({
@@ -109,13 +114,19 @@ vi.mock('@/api/budget', () => ({
 }))
 
 vi.mock('@/api/preferences', () => ({
+  createCustomTag: vi.fn(),
   createSubject: vi.fn(),
+  deleteCustomTag: vi.fn(),
   deleteSubject: vi.fn(),
-  getPreferredCategories: vi.fn(async () => ['食物']),
-  getPreferredItems: vi.fn(async () => ['米']),
-  getPreferredLocations: vi.fn(async () => []),
+  getPreferredCategories: vi.fn(async () => ['category.food']),
+  getItemChoices: vi.fn(async () => [
+    { id: null, value: 'item.rice', is_system: true, selection_count: 0, last_selected_at: null },
+  ]),
+  getLocationChoices: vi.fn(async () => []),
   getSubjectPreferenceDetails: vi.fn(async () => [{ value: '自己', selection_count: 1, last_selected_at: '2099-01-01T00:00:00Z' }]),
   listSubjects: vi.fn(async () => [{ id: 'subject-1', name: '自己' }]),
+  updateCustomTag: vi.fn(),
+  updateSubject: vi.fn(),
 }))
 
 function makeRouter() {

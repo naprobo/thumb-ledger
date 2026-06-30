@@ -10,6 +10,7 @@ export default {
     next: '下一步',
     refresh: '刷新',
     save: '保存',
+    edit: '编辑',
     saved: '已保存',
   },
   nav: {
@@ -119,6 +120,8 @@ export default {
       deleteConfirm: '确定删除这条消费记录吗？',
       categoryDetail: '明细',
       noSubjects: '无花费对象',
+      renameTag: '修改标签名称',
+      newTagName: '新名称',
       previousPage: '上一页',
       nextPage: '下一页',
   },

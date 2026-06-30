@@ -5,6 +5,7 @@ export type Necessity = 'essential' | 'non-essential'
 export interface TransactionItemPayload {
   category_name?: string
   item_name?: string
+  item_tag_id?: string
   amount: number
   currency_code?: string
 }
@@ -16,6 +17,7 @@ export interface TransactionCreatePayload {
   necessity?: Necessity
   note?: string
   location_name?: string
+  location_tag_id?: string
   items?: TransactionItemPayload[]
   subject_ids?: string[]
 }
@@ -27,6 +29,7 @@ export interface TransactionUpdatePayload {
   necessity?: Necessity
   note?: string | null
   location_name?: string | null
+  location_tag_id?: string | null
   items?: TransactionItemPayload[]
   subject_ids?: string[]
 }
@@ -41,14 +44,16 @@ export interface Transaction {
   necessity: string
   note: string | null
   location_name: string | null
+  location_tag_id?: string | null
   items: Array<{
     id: string
     category_name_snapshot: string
     item_name: string | null
+    item_tag_id?: string | null
     amount: number
     currency_code: string
   }>
-  transaction_subjects: Array<{ subject_id: string }>
+  transaction_subjects: Array<{ subject_id: string; name?: string }>
   budget_warning?: 'soft' | 'over' | null
 }
 
