@@ -155,6 +155,9 @@
 13. WHEN Location_Step_Mode is "optional", the Location step SHALL provide a one-tap skip action; WHEN it is "required", skipping or saving an empty location SHALL not be allowed.
 14. THE Transaction_Service SHALL persist Location as a transaction-level text snapshot and expose it in transaction detail/update APIs and CSV export.
 15. WHEN editing a Transaction, THE UI SHALL allow both Item name and Location to be selected from their preference lists or entered as free-form text; selecting a localized system Item SHALL preserve its original translation key.
+16. THE Wizard_Flow SHALL provide edit and hide modes for custom Category, Item, Location, and Subject tags; system-provided tags SHALL NOT be editable or removable.
+17. THE System SHALL assign stable IDs to custom tags. Renaming a custom tag SHALL update historical transaction display, while hiding it SHALL only remove it from selection lists and SHALL NOT delete historical references.
+18. WHEN a User adds a tag whose same-name custom record is hidden in the same scope, THE System SHALL restore that record and reuse its original ID.
 
 ---
 

@@ -112,7 +112,9 @@ sequenceDiagram
 - `GET /ledgers/{id}/categories` — 获取系统固定分类
 - `POST /ledgers/{id}/categories` — Legacy/Internal：添加自定义分类（当前产品不暴露入口）
 - `PATCH /ledgers/{id}/categories/{category_id}` — Legacy/Internal：重命名自定义分类（当前产品不暴露入口）
-- `DELETE /ledgers/{id}/categories/{category_id}` — Legacy/Internal：删除自定义分类（当前产品不暴露入口，系统默认分类不可删）
+- `DELETE /ledgers/{id}/categories/{category_id}` — 隐藏自定义分类；系统默认分类不可操作，历史交易保留
+- `PATCH /ledgers/{id}/subjects/{subject_id}` — 重命名自定义花费对象
+- `DELETE /ledgers/{id}/subjects/{subject_id}` — 隐藏自定义花费对象；预设对象不可操作
 - `GET /ledgers/{id}/share-code` — 获取分享码
 - `POST /ledgers/{id}/share-requests` — 提交加入申请
 - `GET /ledgers/{id}/share-requests` — Owner 查看待审申请
@@ -155,8 +157,13 @@ sequenceDiagram
 - `GET /ledgers/{id}/preferences/categories` — 排序后的分类列表
 - `GET /ledgers/{id}/preferences/items?category={cat}` — 排序后的商品名建议
 - `GET /ledgers/{id}/preferences/locations` — 当前用户按使用频次排序的消费地点
+- `GET /ledgers/{id}/preferences/items/details?category={cat}` — 带稳定 ID、系统/自定义标识的消费名称标签
+- `GET /ledgers/{id}/preferences/locations/details` — 带稳定 ID 的消费地点标签
+- `POST /ledgers/{id}/preferences/tags` — 新建自定义消费名称/地点；同名标签已隐藏时恢复原 ID
+- `PATCH /ledgers/{id}/preferences/tags/{tag_id}` — 重命名自定义标签并同步历史快照
+- `DELETE /ledgers/{id}/preferences/tags/{tag_id}` — 软隐藏自定义标签
 
-偏好更新在交易保存时由 Transaction Service 内部调用，对外不暴露写接口。
+偏好计数在交易保存时由 Transaction Service 内部更新。自定义 Item/Location 使用 `CUSTOM_TAG` 稳定主键，交易同时保存外键与名称快照；重命名更新当前名称和旧快照，隐藏不删除历史引用。系统预置标签不可编辑或隐藏。
 
 #### Export Service
 - MVP 提供 CSV 导出，接口为 `GET /ledgers/{id}/export`
