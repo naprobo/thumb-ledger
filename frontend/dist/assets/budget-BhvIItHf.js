@@ -1,1 +1,0 @@
-import{l as r}from"./index-DLXi_iA3.js";async function a(s,e){return(await r.post(`/ledgers/${s}/budget`,e)).data}async function o(s){var e;try{return(await r.get(`/ledgers/${s}/budget`)).data}catch(t){if(((e=t.response)==null?void 0:e.status)===404)return null;throw t}}export{o as g,a as s};
