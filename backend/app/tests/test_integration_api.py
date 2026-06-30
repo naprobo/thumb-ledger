@@ -400,7 +400,7 @@ async def test_complete_bookkeeping_flow_creates_and_lists_transaction(client: A
 
 
 @pytest.mark.asyncio
-async def test_subject_management_hides_presets_and_limits_custom_subjects(client: AsyncClient) -> None:
+async def test_subject_management_protects_presets_and_limits_custom_subjects(client: AsyncClient) -> None:
     email = unique_email("subjects")
     await register_user(client, email)
     token = await login_user(client, email)
@@ -426,13 +426,13 @@ async def test_subject_management_hides_presets_and_limits_custom_subjects(clien
     preset_subject = subjects.json()[0]
     assert preset_subject["is_preset"] is True
 
-    hidden = await client.delete(
+    protected = await client.delete(
         f"{API_PREFIX}/ledgers/{ledger_id}/subjects/{preset_subject['id']}",
         headers=auth_headers(token),
     )
-    assert hidden.status_code == 200
-    after_hide = await client.get(f"{API_PREFIX}/ledgers/{ledger_id}/subjects", headers=auth_headers(token))
-    assert preset_subject["id"] not in {subject["id"] for subject in after_hide.json()}
+    assert protected.status_code == 403
+    after_rejected_delete = await client.get(f"{API_PREFIX}/ledgers/{ledger_id}/subjects", headers=auth_headers(token))
+    assert preset_subject["id"] in {subject["id"] for subject in after_rejected_delete.json()}
 
     custom_ids = []
     for index in range(20):
@@ -458,6 +458,145 @@ async def test_subject_management_hides_presets_and_limits_custom_subjects(clien
     assert deleted.status_code == 200
     after_delete = await client.get(f"{API_PREFIX}/ledgers/{ledger_id}/subjects", headers=auth_headers(token))
     assert custom_ids[0] not in {subject["id"] for subject in after_delete.json()}
+
+
+@pytest.mark.asyncio
+async def test_custom_tags_rename_history_soft_hide_and_restore(client: AsyncClient) -> None:
+    email = unique_email("editable-tags")
+    await register_user(client, email)
+    token = await login_user(client, email)
+    headers = auth_headers(token)
+    ledger_response = await client.post(
+        f"{API_PREFIX}/ledgers",
+        headers=headers,
+        json={
+            "name": "Editable Tags",
+            "entry_mode": "receipt",
+            "receipt_item_enabled": True,
+            "location_step_mode": "optional",
+            "subject_enabled": True,
+            "subject_step_mode": "optional",
+            "necessity_step_mode": "disabled",
+            "default_currency_code": "JPY",
+            "timezone": "Asia/Tokyo",
+            "budget_enabled": False,
+        },
+    )
+    assert ledger_response.status_code == 201, ledger_response.text
+    ledger_id = ledger_response.json()["id"]
+
+    subject = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger_id}/subjects",
+        headers=headers,
+        json={"name": "家族"},
+    )
+    assert subject.status_code == 201, subject.text
+    subject_id = subject.json()["id"]
+
+    item_tag = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger_id}/preferences/tags",
+        headers=headers,
+        json={"tag_type": "item", "name": "週末ランチ", "category": "category.dining"},
+    )
+    location_tag = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger_id}/preferences/tags",
+        headers=headers,
+        json={"tag_type": "location", "name": "駅前店"},
+    )
+    assert item_tag.status_code == 200, item_tag.text
+    assert location_tag.status_code == 200, location_tag.text
+    item_tag_id = item_tag.json()["id"]
+    location_tag_id = location_tag.json()["id"]
+
+    transaction = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger_id}/transactions",
+        headers=headers,
+        json={
+            "amount": 1800,
+            "currency_code": "JPY",
+            "location_tag_id": location_tag_id,
+            "items": [
+                {
+                    "category_name": "category.dining",
+                    "item_tag_id": item_tag_id,
+                    "amount": 1800,
+                    "currency_code": "JPY",
+                }
+            ],
+            "subject_ids": [subject_id],
+        },
+    )
+    assert transaction.status_code == 201, transaction.text
+    transaction_id = transaction.json()["id"]
+
+    renamed_subject = await client.patch(
+        f"{API_PREFIX}/ledgers/{ledger_id}/subjects/{subject_id}",
+        headers=headers,
+        json={"name": "家族全員"},
+    )
+    renamed_item = await client.patch(
+        f"{API_PREFIX}/ledgers/{ledger_id}/preferences/tags/{item_tag_id}",
+        headers=headers,
+        json={"name": "休日ランチ"},
+    )
+    renamed_location = await client.patch(
+        f"{API_PREFIX}/ledgers/{ledger_id}/preferences/tags/{location_tag_id}",
+        headers=headers,
+        json={"name": "中央駅前店"},
+    )
+    assert renamed_subject.status_code == 200, renamed_subject.text
+    assert renamed_item.status_code == 200, renamed_item.text
+    assert renamed_location.status_code == 200, renamed_location.text
+
+    history = await client.get(
+        f"{API_PREFIX}/ledgers/{ledger_id}/transactions/{transaction_id}",
+        headers=headers,
+    )
+    assert history.status_code == 200, history.text
+    assert history.json()["items"][0]["item_name"] == "休日ランチ"
+    assert history.json()["location_name"] == "中央駅前店"
+    assert history.json()["transaction_subjects"][0]["name"] == "家族全員"
+
+    for path in (
+        f"{API_PREFIX}/ledgers/{ledger_id}/subjects/{subject_id}",
+        f"{API_PREFIX}/ledgers/{ledger_id}/preferences/tags/{item_tag_id}",
+        f"{API_PREFIX}/ledgers/{ledger_id}/preferences/tags/{location_tag_id}",
+    ):
+        response = await client.delete(path, headers=headers)
+        assert response.status_code == 200, response.text
+
+    visible_subjects = await client.get(f"{API_PREFIX}/ledgers/{ledger_id}/subjects", headers=headers)
+    visible_items = await client.get(
+        f"{API_PREFIX}/ledgers/{ledger_id}/preferences/items/details",
+        headers=headers,
+        params={"category": "category.dining"},
+    )
+    visible_locations = await client.get(
+        f"{API_PREFIX}/ledgers/{ledger_id}/preferences/locations/details",
+        headers=headers,
+    )
+    assert subject_id not in {row["id"] for row in visible_subjects.json()}
+    assert item_tag_id not in {row["id"] for row in visible_items.json()["items"]}
+    assert location_tag_id not in {row["id"] for row in visible_locations.json()["items"]}
+
+    restored_subject = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger_id}/subjects",
+        headers=headers,
+        json={"name": "家族全員"},
+    )
+    restored_item = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger_id}/preferences/tags",
+        headers=headers,
+        json={"tag_type": "item", "name": "休日ランチ", "category": "category.dining"},
+    )
+    restored_location = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger_id}/preferences/tags",
+        headers=headers,
+        json={"tag_type": "location", "name": "中央駅前店"},
+    )
+    assert restored_subject.json()["id"] == subject_id
+    assert restored_item.json()["id"] == item_tag_id
+    assert restored_location.json()["id"] == location_tag_id
 
 
 @pytest.mark.asyncio

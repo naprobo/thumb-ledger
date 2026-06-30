@@ -74,6 +74,7 @@ export interface Category {
   ledger_id: string
   name: string
   is_system: boolean
+  is_hidden?: boolean
   display_order: number
 }
 
@@ -147,4 +148,13 @@ export async function rejectShareRequest(ledgerId: string, requestId: string): P
 export async function listCategories(ledgerId: string): Promise<Category[]> {
   const response = await apiClient.get<Category[]>(`/ledgers/${ledgerId}/categories`)
   return response.data
+}
+
+export async function updateCategory(ledgerId: string, categoryId: string, name: string): Promise<Category> {
+  const response = await apiClient.patch<Category>(`/ledgers/${ledgerId}/categories/${categoryId}`, { name })
+  return response.data
+}
+
+export async function deleteCategory(ledgerId: string, categoryId: string): Promise<void> {
+  await apiClient.delete(`/ledgers/${ledgerId}/categories/${categoryId}`)
 }

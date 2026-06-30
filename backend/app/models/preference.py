@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -80,4 +80,39 @@ class Preference(Base):
     user: Mapped["User"] = relationship(
         "User",
         back_populates="preferences",
+    )
+
+
+class CustomTag(Base):
+    """账本内可重命名、可隐藏的消费名称和消费地点标签。"""
+
+    __tablename__ = "custom_tags"
+    __table_args__ = (
+        UniqueConstraint(
+            "ledger_id",
+            "tag_type",
+            "scope",
+            "name",
+            name="uq_custom_tag_ledger_type_scope_name",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    ledger_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ledgers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # 'item' | 'location'
+    tag_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    # item 使用 category 名称作为作用域，location 使用空字符串
+    scope: Mapped[str] = mapped_column(String(50), default="", nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    is_hidden: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )

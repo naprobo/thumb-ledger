@@ -8,20 +8,58 @@ import WizardFlow from '@/components/WizardFlow.vue'
 import { buildWizardSteps } from '@/components/wizard/types'
 
 const preferredItems = vi.hoisted(() => ['item.rice', 'item.eggs'])
+const preferredLocations = vi.hoisted(() => ['駅前スーパー'])
+
+vi.mock('@/api/ledgers', () => ({
+  listCategories: vi.fn(async () => [
+    { id: 'category-1', ledger_id: 'ledger-1', name: 'category.food', is_system: true, display_order: 0 },
+    { id: 'category-2', ledger_id: 'ledger-1', name: 'category.transport', is_system: true, display_order: 1 },
+  ]),
+  updateCategory: vi.fn(),
+  deleteCategory: vi.fn(),
+}))
 
 vi.mock('@/api/preferences', () => ({
+  createCustomTag: vi.fn(async (_ledgerId, payload) => {
+    const values = payload.tag_type === 'item' ? preferredItems : preferredLocations
+    if (!values.includes(payload.name)) values.unshift(payload.name)
+    return {
+      id: `${payload.tag_type}-custom`,
+      tag_type: payload.tag_type,
+      name: payload.name,
+      category: payload.category || null,
+      is_hidden: false,
+    }
+  }),
   createSubject: vi.fn(async (_ledgerId, name) => ({ id: 'subject-custom', name, is_preset: false })),
+  deleteCustomTag: vi.fn(async () => undefined),
   deleteSubject: vi.fn(async () => undefined),
+  updateCustomTag: vi.fn(),
+  updateSubject: vi.fn(),
   getPreferredCategories: vi.fn(async () => ['category.food', 'category.transport']),
-  getPreferredItems: vi.fn(async () => preferredItems),
-  getPreferredLocations: vi.fn(async () => ['駅前スーパー']),
+  getItemChoices: vi.fn(async () => preferredItems.map((value) => ({
+    id: value.startsWith('item.') ? null : 'item-custom',
+    value,
+    is_system: value.startsWith('item.'),
+    selection_count: 0,
+    last_selected_at: null,
+  }))),
+  getLocationChoices: vi.fn(async () => preferredLocations.map((value) => ({
+    id: 'location-custom',
+    value,
+    is_system: false,
+    selection_count: 0,
+    last_selected_at: null,
+  }))),
   getSubjectPreferenceDetails: vi.fn(async () => [
     { value: 'subject.self', selection_count: 4, last_selected_at: '2099-01-01T00:00:00Z' },
     { value: 'subject.mom', selection_count: 0, last_selected_at: null },
+    { value: '家族', selection_count: 0, last_selected_at: null },
   ]),
   listSubjects: vi.fn(async () => [
-    { id: 'subject-1', name: 'subject.self' },
-    { id: 'subject-2', name: 'subject.mom' },
+    { id: 'subject-1', name: 'subject.self', is_preset: true },
+    { id: 'subject-2', name: 'subject.mom', is_preset: true },
+    { id: 'subject-custom-existing', name: '家族', is_preset: false },
   ]),
 }))
 
@@ -60,6 +98,7 @@ describe('WizardFlow', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     preferredItems.splice(0, preferredItems.length, 'item.rice', 'item.eggs')
+    preferredLocations.splice(0, preferredLocations.length, '駅前スーパー')
   })
 
   afterEach(() => {
@@ -518,11 +557,12 @@ describe('WizardFlow', () => {
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.find('.wizard-titlebar h2').text()).toBe('花费对象'))
 
-    await wrapper.find('.title-action-button').trigger('click')
-    await wrapper.findAll('.subject-chip').find((button) => button.text().includes('自己'))?.trigger('click')
+    await wrapper.findAll('.title-action-button')[1].trigger('click')
+    expect(wrapper.findAll('.subject-chip').find((button) => button.text().includes('自己'))?.attributes('disabled')).toBeDefined()
+    await wrapper.findAll('.subject-chip').find((button) => button.text().includes('家族'))?.trigger('click')
 
-    expect(deleteSubject).toHaveBeenCalledWith('ledger-1', 'subject-1')
-    expect(wrapper.text()).not.toContain('自己')
+    expect(deleteSubject).toHaveBeenCalledWith('ledger-1', 'subject-custom-existing')
+    expect(wrapper.text()).not.toContain('家族')
   })
 
   it('moves to the next available step after disabling necessity', async () => {
@@ -576,9 +616,11 @@ describe('WizardFlow', () => {
     await vi.waitFor(() => expect(wrapper.find('.keypad').exists()).toBe(true))
     await wrapper.findAll('.keypad button').find((button) => button.text() === '1')?.trigger('click')
     await wrapper.findAll('.keypad button').find((button) => button.text() === 'OK')?.trigger('click')
+    expect(wrapper.find('.title-actions').exists()).toBe(false)
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '食品饮料')?.trigger('click')
     await vi.waitFor(() => expect(wrapper.text()).toContain('自定义'))
 
+    expect(wrapper.find('.title-actions').exists()).toBe(false)
     expect(wrapper.find('.custom-item-field input').exists()).toBe(false)
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '自定义')?.trigger('click')
     expect(wrapper.find('.custom-item-field input').exists()).toBe(true)
@@ -618,6 +660,7 @@ describe('WizardFlow', () => {
     expect(createTransaction).not.toHaveBeenCalled()
     expect(wrapper.find('.location-field').exists()).toBe(false)
     expect(wrapper.findAll('.chip-grid button').some((button) => button.text() === '公司附近')).toBe(true)
+    expect(wrapper.find('.title-actions').exists()).toBe(true)
     await wrapper.findAll('.chip-grid button').find((button) => button.text() === '公司附近')?.trigger('click')
 
     await vi.waitFor(() => expect(createTransaction).toHaveBeenCalledTimes(1))

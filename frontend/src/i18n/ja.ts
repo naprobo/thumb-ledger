@@ -10,6 +10,7 @@ export default {
     next: '次へ',
     refresh: '更新',
     save: '保存',
+    edit: '編集',
     saved: '保存しました',
   },
   nav: {
@@ -119,6 +120,8 @@ export default {
       deleteConfirm: 'この支出記録を削除しますか？',
       categoryDetail: '明細',
       noSubjects: '支出対象なし',
+      renameTag: 'タグ名を変更',
+      newTagName: '新しい名前',
       previousPage: '前へ',
       nextPage: '次へ',
   },

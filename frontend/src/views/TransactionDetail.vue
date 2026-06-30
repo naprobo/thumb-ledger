@@ -200,6 +200,7 @@ const draft = reactive({
   itemName: '' as string | null,
   originalItemName: '',
   locationName: '' as string | null,
+  originalLocationName: '',
   necessity: 'essential' as Necessity,
   note: '',
   subjectIds: [] as string[],
@@ -217,10 +218,10 @@ const necessityOptions = computed(() => [
   { label: t('transaction.nonEssential'), value: 'non-essential' },
 ])
 const subjectLabels = computed(() => {
-  const selected = transaction.value?.transaction_subjects.map((row) => row.subject_id) || []
-  return subjects.value
-    .filter((subject) => selected.includes(subject.id))
-    .map((subject) => translateLabel(subject.name, t))
+  return (transaction.value?.transaction_subjects || [])
+    .map((row) => row.name || subjects.value.find((subject) => subject.id === row.subject_id)?.name)
+    .filter((name): name is string => !!name)
+    .map((name) => translateLabel(name, t))
     .join(', ')
 })
 
@@ -258,6 +259,7 @@ function startEdit() {
   draft.originalItemName = item?.item_name || ''
   draft.itemName = item?.item_name ? translateLabel(item.item_name, t) : ''
   draft.locationName = transaction.value.location_name || ''
+  draft.originalLocationName = transaction.value.location_name || ''
   draft.necessity = transaction.value.necessity === 'non-essential' ? 'non-essential' : 'essential'
   draft.note = transaction.value.note || ''
   draft.subjectIds = transaction.value.transaction_subjects.map((subject) => subject.subject_id)
@@ -280,6 +282,9 @@ async function saveEdit() {
       necessity: draft.necessity,
       note: draft.note || null,
       location_name: draft.locationName?.trim() || null,
+      location_tag_id: draft.locationName?.trim() === draft.originalLocationName
+        ? transaction.value.location_tag_id || null
+        : null,
       subject_ids: draft.subjectIds,
     }
     if (canEditSimpleEntry.value) {
@@ -290,6 +295,9 @@ async function saveEdit() {
           {
             category_name: draft.category,
             item_name: itemNameForSave(),
+            item_tag_id: itemNameForSave() === draft.originalItemName
+              ? transaction.value.items[0]?.item_tag_id || undefined
+              : undefined,
             amount: parsedAmount,
             currency_code: transaction.value.currency_code,
           },

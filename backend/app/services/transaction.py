@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.ledger import Category, Ledger, Subject
+from app.models.preference import CustomTag
 from app.models.transaction import Transaction, TransactionItem, TransactionSubject
 from app.models.user import User
 from app.schemas.transaction import TransactionCreateRequest, TransactionItemRequest, TransactionUpdateRequest
@@ -53,12 +54,16 @@ def validate_location_payload(
     creating: bool = False,
 ) -> None:
     if ledger.location_step_mode == "required":
-        if creating and not payload.location_name:
+        if creating and not payload.location_name and not payload.location_tag_id:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Spending location is required.",
             )
-        if "location_name" in payload.model_fields_set and not payload.location_name:
+        if (
+            "location_name" in payload.model_fields_set
+            and not payload.location_name
+            and not payload.location_tag_id
+        ):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Spending location is required.",
@@ -128,11 +133,23 @@ async def build_transaction_items(
     items: list[TransactionItem] = []
     for item in source_items:
         category_id, category_name = await get_category_snapshot(db, ledger.id, item)
+        item_tag = None
+        item_name = item.item_name
+        if item.item_tag_id is not None:
+            item_tag = await validate_custom_tag(
+                db,
+                ledger.id,
+                item.item_tag_id,
+                "item",
+                category_name,
+            )
+            item_name = item_tag.name
         items.append(
             TransactionItem(
                 category_id=category_id,
                 category_name_snapshot=category_name,
-                item_name=item.item_name,
+                item_name=item_name,
+                item_tag_id=item_tag.id if item_tag else None,
                 amount=item.amount,
                 currency_code=item.currency_code or currency_code,
             )
@@ -140,11 +157,36 @@ async def build_transaction_items(
     return items
 
 
+async def validate_custom_tag(
+    db: AsyncSession,
+    ledger_id: uuid.UUID,
+    tag_id: uuid.UUID,
+    tag_type: str,
+    scope: str = "",
+) -> CustomTag:
+    tag = await db.scalar(
+        select(CustomTag).where(
+            CustomTag.id == tag_id,
+            CustomTag.ledger_id == ledger_id,
+            CustomTag.tag_type == tag_type,
+            CustomTag.scope == scope,
+            CustomTag.is_hidden.is_(False),
+        )
+    )
+    if tag is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Custom tag not found")
+    return tag
+
+
 async def validate_subjects(db: AsyncSession, ledger: Ledger, subject_ids: list[uuid.UUID]) -> list[Subject]:
     if not subject_ids:
         return []
     result = await db.execute(
-        select(Subject).where(Subject.ledger_id == ledger.id, Subject.id.in_(subject_ids))
+        select(Subject).where(
+            Subject.ledger_id == ledger.id,
+            Subject.id.in_(subject_ids),
+            Subject.is_hidden.is_(False),
+        )
     )
     subjects = list(result.scalars().all())
     if len(subjects) != len(set(subject_ids)):

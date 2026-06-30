@@ -1,24 +1,29 @@
 <template>
   <section class="wizard-step">
     <h2>{{ t('transaction.itemName') }}</h2>
-    <v-btn v-if="optional" class="skip-button" color="warning" variant="tonal" size="large" block @click="$emit('skip')">
+    <v-btn v-if="optional && !managementMode" class="skip-button" color="warning" variant="tonal" size="large" block @click="$emit('skip')">
       <AlertTriangle :size="20" aria-hidden="true" />
       <span>{{ t('transaction.skip') }}</span>
     </v-btn>
     <div class="chip-grid">
       <v-btn
         v-for="item in items"
-        :key="item"
+        :key="item.id || item.value"
         class="choice-button"
-        :class="{ selected: item === modelValue }"
-        :color="item === modelValue ? 'primary' : undefined"
-        :variant="item === modelValue ? 'tonal' : 'outlined'"
+        :class="{ selected: item.value === modelValue, 'managed-chip': managementMode && !item.is_system }"
+        :color="item.value === modelValue ? 'primary' : undefined"
+        :variant="item.value === modelValue ? 'tonal' : 'outlined'"
+        :disabled="managementMode !== null && item.is_system"
         size="large"
         rounded="lg"
         block
-        @click="$emit('select', item)"
+        @click="managementMode ? $emit('manage', item) : $emit('select', item)"
       >
-        {{ translateLabel(item, t) }}
+        {{ translateLabel(item.value, t) }}
+        <span v-if="managementMode && !item.is_system" class="manage-overlay" aria-hidden="true">
+          <Pencil v-if="managementMode === 'edit'" :size="24" />
+          <Trash2 v-else :size="24" />
+        </span>
       </v-btn>
       <v-btn
         class="choice-button add-chip"
@@ -29,6 +34,7 @@
         rounded="lg"
         block
         @click="openCustom"
+        v-if="!managementMode"
       >
         <Plus :size="20" aria-hidden="true" />
         <span>{{ t('transaction.customItem') }}</span>
@@ -57,20 +63,22 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertTriangle, Plus } from '@lucide/vue'
+import { AlertTriangle, Pencil, Plus, Trash2 } from '@lucide/vue'
 import { translateLabel } from '@/i18n/labels'
+import type { TagChoice } from '@/api/preferences'
+import type { TagManagementMode } from '@/components/wizard/types'
 
-const props = withDefaults(defineProps<{ items: string[]; modelValue: string; optional?: boolean }>(), {
+const props = withDefaults(defineProps<{ items: TagChoice[]; modelValue: string; optional?: boolean; managementMode: TagManagementMode }>(), {
   optional: false,
 })
-const emit = defineEmits<{ select: [item: string]; skip: [] }>()
+const emit = defineEmits<{ select: [item: TagChoice]; create: [name: string]; manage: [item: TagChoice]; skip: [] }>()
 const { t } = useI18n()
 const isCustomOpen = ref(false)
 const customValue = ref('')
 const customInput = ref<{ focus: () => void } | null>(null)
 
 watch(() => props.modelValue, (value) => {
-  if (!value || props.items.includes(value)) return
+  if (!value || props.items.some((item) => item.value === value)) return
   customValue.value = value
   isCustomOpen.value = true
 })
@@ -82,7 +90,10 @@ async function openCustom() {
 }
 
 function confirmCustom() {
-  if (customValue.value) emit('select', customValue.value)
+  if (!customValue.value) return
+  emit('create', customValue.value)
+  customValue.value = ''
+  isCustomOpen.value = false
 }
 </script>
 
@@ -118,5 +129,19 @@ function confirmCustom() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.managed-chip {
+  position: relative;
+  overflow: hidden;
+}
+
+.manage-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(30 41 59 / 72%);
+  color: #fff;
 }
 </style>
