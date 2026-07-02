@@ -1,0 +1,1 @@
+import{l as a}from"./index-B9-XL3wu.js";async function o(t,e){return(await a.post(`/ledgers/${t}/budget`,e)).data}async function u(t,e){var s;try{return(await a.get(`/ledgers/${t}/budget`,{params:{target_month:e}})).data}catch(r){if(((s=r.response)==null?void 0:s.status)===404)return null;throw r}}export{u as g,o as s};
