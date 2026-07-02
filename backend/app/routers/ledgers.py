@@ -2,6 +2,7 @@
 账本管理 API 路由
 """
 import uuid
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select, update
@@ -123,8 +124,14 @@ async def list_ledgers(
     )
     ledgers = list(result.scalars().unique().all())
     totals = await _ledger_total_amounts(db, [ledger.id for ledger in ledgers])
+    current_month_totals = await _ledger_current_month_amounts(db, [ledger.id for ledger in ledgers])
     return [
-        LedgerResponse.model_validate(ledger).model_copy(update={"total_amounts": totals.get(ledger.id, {})})
+        LedgerResponse.model_validate(ledger).model_copy(
+            update={
+                "total_amounts": totals.get(ledger.id, {}),
+                "current_month_amounts": current_month_totals.get(ledger.id, {}),
+            }
+        )
         for ledger in ledgers
     ]
 
@@ -138,7 +145,13 @@ async def get_ledger(
     ledger = await get_ledger_or_404(db, ledger_id)
     await require_read_ledger(db, ledger, current_user)
     totals = await _ledger_total_amounts(db, [ledger.id])
-    return LedgerResponse.model_validate(ledger).model_copy(update={"total_amounts": totals.get(ledger.id, {})})
+    current_month_totals = await _ledger_current_month_amounts(db, [ledger.id])
+    return LedgerResponse.model_validate(ledger).model_copy(
+        update={
+            "total_amounts": totals.get(ledger.id, {}),
+            "current_month_amounts": current_month_totals.get(ledger.id, {}),
+        }
+    )
 
 
 async def _ledger_total_amounts(db: AsyncSession, ledger_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict[str, int]]:
@@ -147,6 +160,35 @@ async def _ledger_total_amounts(db: AsyncSession, ledger_ids: list[uuid.UUID]) -
     result = await db.execute(
         select(Transaction.ledger_id, Transaction.currency_code, func.coalesce(func.sum(Transaction.amount), 0))
         .where(Transaction.ledger_id.in_(ledger_ids))
+        .group_by(Transaction.ledger_id, Transaction.currency_code)
+    )
+    totals: dict[uuid.UUID, dict[str, int]] = {ledger_id: {} for ledger_id in ledger_ids}
+    for ledger_id, currency_code, amount in result.all():
+        totals[ledger_id][currency_code] = int(amount)
+    return totals
+
+
+async def _ledger_current_month_amounts(
+    db: AsyncSession,
+    ledger_ids: list[uuid.UUID],
+    today: date | None = None,
+) -> dict[uuid.UUID, dict[str, int]]:
+    if not ledger_ids:
+        return {}
+    current = today or date.today()
+    month_start = current.replace(day=1)
+    next_month = (
+        month_start.replace(year=month_start.year + 1, month=1)
+        if month_start.month == 12
+        else month_start.replace(month=month_start.month + 1)
+    )
+    result = await db.execute(
+        select(Transaction.ledger_id, Transaction.currency_code, func.coalesce(func.sum(Transaction.amount), 0))
+        .where(
+            Transaction.ledger_id.in_(ledger_ids),
+            Transaction.transaction_date >= month_start,
+            Transaction.transaction_date < next_month,
+        )
         .group_by(Transaction.ledger_id, Transaction.currency_code)
     )
     totals: dict[uuid.UUID, dict[str, int]] = {ledger_id: {} for ledger_id in ledger_ids}
@@ -169,7 +211,13 @@ async def update_ledger(
     await db.flush()
     await db.refresh(ledger)
     totals = await _ledger_total_amounts(db, [ledger.id])
-    return LedgerResponse.model_validate(ledger).model_copy(update={"total_amounts": totals.get(ledger.id, {})})
+    current_month_totals = await _ledger_current_month_amounts(db, [ledger.id])
+    return LedgerResponse.model_validate(ledger).model_copy(
+        update={
+            "total_amounts": totals.get(ledger.id, {}),
+            "current_month_amounts": current_month_totals.get(ledger.id, {}),
+        }
+    )
 
 
 @router.delete("/{ledger_id}")

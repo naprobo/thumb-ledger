@@ -64,6 +64,7 @@ class LedgerResponse(BaseModel):
     timezone: str
     budget_enabled: bool
     total_amounts: dict[str, int] = Field(default_factory=dict)
+    current_month_amounts: dict[str, int] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
 

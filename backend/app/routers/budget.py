@@ -2,8 +2,9 @@
 预算 API 路由
 """
 import uuid
+from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -35,15 +36,19 @@ async def get_budget_with_categories(db: AsyncSession, ledger_id: uuid.UUID) -> 
     )
 
 
-async def build_budget_response(db: AsyncSession, budget: Budget) -> BudgetResponse:
+async def build_budget_response(
+    db: AsyncSession,
+    budget: Budget,
+    target_month: date | None = None,
+) -> BudgetResponse:
     ledger = await get_ledger_or_404(db, budget.ledger_id)
-    spent = await monthly_spending(db, ledger)
+    spent = await monthly_spending(db, ledger, today=target_month)
     progress = BudgetProgressResponse(
         monthly_spent=spent,
         monthly_total=budget.monthly_total,
         percentage=spent / budget.monthly_total if budget.monthly_total else 0,
         warning=budget_warning_for_progress(spent, budget.monthly_total),
-        category_spending=await monthly_category_spending(db, ledger),
+        category_spending=await monthly_category_spending(db, ledger, today=target_month),
     )
     return BudgetResponse(
         id=budget.id,
@@ -69,9 +74,8 @@ async def upsert_budget(
     await require_write_ledger(db, ledger, current_user)
     budget = await get_budget_with_categories(db, ledger_id)
     if budget is None:
-        budget = Budget(ledger_id=ledger_id, monthly_total=payload.monthly_total)
+        budget = Budget(ledger_id=ledger_id, monthly_total=payload.monthly_total, categories=[])
         db.add(budget)
-        await db.flush()
 
     budget.monthly_total = payload.monthly_total
     budget.annual_total = default_annual_total(payload.monthly_total, payload.annual_total)
@@ -87,12 +91,16 @@ async def upsert_budget(
         allocations = {item.category: item.amount for item in payload.categories}
     replace_budget_categories(budget, allocations)
     await db.flush()
-    return await build_budget_response(db, budget)
+    refreshed_budget = await get_budget_with_categories(db, ledger_id)
+    if refreshed_budget is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Budget reload failed")
+    return await build_budget_response(db, refreshed_budget)
 
 
 @router.get("", response_model=BudgetResponse)
 async def get_budget(
     ledger_id: uuid.UUID,
+    target_month: date | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> BudgetResponse:
@@ -101,7 +109,7 @@ async def get_budget(
     budget = await get_budget_with_categories(db, ledger_id)
     if budget is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Budget not found")
-    return await build_budget_response(db, budget)
+    return await build_budget_response(db, budget, target_month=target_month)
 
 
 @router.delete("")
