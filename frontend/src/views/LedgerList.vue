@@ -145,7 +145,10 @@
           <strong>{{ ledger.name }}</strong>
           <span>{{ modeLabel(ledger.entry_mode) }}</span>
         </div>
-        <span class="ledger-total">{{ ledgerTotalLabel(ledger) }}</span>
+        <div class="ledger-amounts">
+          <span class="ledger-total">{{ ledgerTotalLabel(ledger) }}</span>
+          <small>{{ ledgerCurrentMonthLabel(ledger) }}</small>
+        </div>
         <button
           v-if="canManageLedger(ledger)"
           type="button"
@@ -247,6 +250,12 @@ function ledgerTotalLabel(ledger: Ledger): string {
   const totals = Object.entries(ledger.total_amounts || {})
   if (!totals.length) return `${t('summary.total')} ${formatMoneyWithTrailingSymbol(0, ledger.default_currency_code)}`
   return `${t('summary.total')} ${totals.map(([currency, amount]) => formatMoneyWithTrailingSymbol(amount, currency)).join(' / ')}`
+}
+
+function ledgerCurrentMonthLabel(ledger: Ledger): string {
+  const totals = Object.entries(ledger.current_month_amounts || {})
+  if (!totals.length) return `${t('transaction.monthTotal')} ${formatMoneyWithTrailingSymbol(0, ledger.default_currency_code)}`
+  return `${t('transaction.monthTotal')} ${totals.map(([currency, amount]) => formatMoneyWithTrailingSymbol(amount, currency)).join(' / ')}`
 }
 
 function canManageLedger(ledger: Ledger): boolean {
@@ -467,6 +476,19 @@ button:disabled {
   color: #0f172a;
   font-size: 1.05rem;
   font-weight: 800;
+}
+
+.ledger-amounts {
+  display: grid;
+  min-width: max-content;
+  gap: 3px;
+  justify-items: end;
+}
+
+.ledger-amounts small {
+  color: #607086;
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .settings-icon-button {

@@ -19,6 +19,7 @@ export interface Ledger {
   timezone: string
   budget_enabled: boolean
   total_amounts?: Record<string, number>
+  current_month_amounts?: Record<string, number>
   created_at: string
   updated_at: string
 }

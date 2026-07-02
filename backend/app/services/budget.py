@@ -43,7 +43,9 @@ def current_month_range(today: date | None = None) -> tuple[date, date]:
 
 async def active_category_names(db: AsyncSession, ledger_id: uuid.UUID) -> list[str]:
     result = await db.execute(
-        select(Category.name).where(Category.ledger_id == ledger_id).order_by(Category.display_order.asc())
+        select(Category.name)
+        .where(Category.ledger_id == ledger_id, Category.is_hidden.is_(False))
+        .order_by(Category.display_order.asc())
     )
     return list(result.scalars().all())
 

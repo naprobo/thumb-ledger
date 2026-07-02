@@ -7,15 +7,23 @@ import { getBudget } from '@/api/budget'
 import { listTransactions } from '@/api/transactions'
 import LedgerDetail from '@/views/LedgerDetail.vue'
 
+const mockLedgerDisplay = vi.hoisted(() => ({
+  locationStepMode: 'optional',
+  necessityStepMode: 'required',
+  subjectEnabled: true,
+  subjectStepMode: 'required',
+}))
+
 vi.mock('@/api/ledgers', () => ({
   getLedger: vi.fn(async () => ({
     id: 'ledger-1',
     owner_id: 'user-1',
     name: 'Home',
     entry_mode: 'receipt',
-    subject_enabled: true,
-    subject_step_mode: 'required',
-    necessity_step_mode: 'required',
+    location_step_mode: mockLedgerDisplay.locationStepMode,
+    subject_enabled: mockLedgerDisplay.subjectEnabled,
+    subject_step_mode: mockLedgerDisplay.subjectStepMode,
+    necessity_step_mode: mockLedgerDisplay.necessityStepMode,
     default_currency_code: 'JPY',
     timezone: 'Asia/Tokyo',
     budget_enabled: true,
@@ -54,8 +62,9 @@ vi.mock('@/api/transactions', () => ({
         transaction_date: '2026-06-12',
         necessity: 'essential',
         note: 'Lunch',
+        location_name: '駅前カフェ',
         items: [{ id: 'item-1', category_name_snapshot: 'category.food', item_name: 'item.cafe', amount: 1200, currency_code: 'JPY' }],
-        transaction_subjects: [{ subject_id: 'subject-1' }],
+        transaction_subjects: [{ subject_id: 'subject-1', name: 'subject.self' }],
       },
       {
         id: 'txn-2',
@@ -66,8 +75,9 @@ vi.mock('@/api/transactions', () => ({
         transaction_date: '2026-06-14',
         necessity: 'essential',
         note: '',
+        location_name: null,
         items: [{ id: 'item-2', category_name_snapshot: 'category.transport', item_name: 'item.train', amount: 800, currency_code: 'JPY' }],
-        transaction_subjects: [{ subject_id: 'subject-1' }],
+        transaction_subjects: [{ subject_id: 'subject-1', name: 'subject.self' }],
       },
       {
         id: 'txn-3',
@@ -78,8 +88,9 @@ vi.mock('@/api/transactions', () => ({
         transaction_date: '2026-06-14',
         necessity: 'non-essential',
         note: '',
+        location_name: null,
         items: [{ id: 'item-3', category_name_snapshot: 'category.food', item_name: 'item.restaurant', amount: 600, currency_code: 'JPY' }],
-        transaction_subjects: [{ subject_id: 'subject-1' }],
+        transaction_subjects: [{ subject_id: 'subject-1', name: 'subject.self' }],
       },
     ],
     page: 1,
@@ -151,6 +162,10 @@ describe('LedgerDetail', () => {
     mockBudget.warning = 'soft'
     mockBudget.percentage = 0.85
     mockBudget.spent = 8500
+    mockLedgerDisplay.locationStepMode = 'optional'
+    mockLedgerDisplay.necessityStepMode = 'required'
+    mockLedgerDisplay.subjectEnabled = true
+    mockLedgerDisplay.subjectStepMode = 'required'
   })
 
   it('renders prominent transaction action, budget progress, and transaction list', async () => {
@@ -164,6 +179,7 @@ describe('LedgerDetail', () => {
 
     expect(wrapper.find('.topbar .record-button').exists()).toBe(true)
     expect(wrapper.find('.budget-panel.soft').exists()).toBe(true)
+    expect(wrapper.find('.budget-panel').text()).toContain('本月支出进度（85%）')
     expect(wrapper.text()).not.toContain('消费记录 ·')
     expect(wrapper.text()).toContain('本月合计')
     expect(wrapper.find('.records-section').exists()).toBe(true)
@@ -183,6 +199,7 @@ describe('LedgerDetail', () => {
     expect(wrapper.findAll('.month-nav button')).toHaveLength(2)
     expect(wrapper.find('.transaction-list li').classes()).not.toContain('transaction-meta')
     expect(wrapper.findAll('.transaction-name').map((name) => name.text())).toContain('咖啡')
+    expect(wrapper.findAll('.transaction-context').map((context) => context.text())).toEqual(['-', '-', '駅前カフェ'])
     expect(wrapper.findAll('.day-group header strong').map((date) => date.text())).toEqual(['2026-06-14', '2026-06-12'])
     expect(wrapper.find('.pie-chart').exists()).toBe(true)
     expect(wrapper.findAll('.chart-legend li')).toHaveLength(2)
@@ -193,6 +210,11 @@ describe('LedgerDetail', () => {
       expect.stringMatching(/^\d{4}-\d{2}-01$/),
       expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
     )
+    expect(getBudget).toHaveBeenCalledWith('ledger-1', expect.stringMatching(/^\d{4}-\d{2}-01$/))
+
+    await wrapper.findAll('.month-nav button')[0].trigger('click')
+    await vi.waitFor(() => expect(getBudget).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(getBudget).mock.calls[1][1]).toMatch(/^\d{4}-\d{2}-01$/)
   })
 
   it('hides ledger chrome and transaction history while recording a transaction', async () => {
@@ -226,5 +248,29 @@ describe('LedgerDetail', () => {
 
     expect(wrapper.find('.budget-panel.over').exists()).toBe(true)
     expect(wrapper.text()).toMatch(/已超出预算|Over budget|予算を超えました/)
+  })
+
+  it('falls back from location to necessity and then subject', async () => {
+    mockLedgerDisplay.locationStepMode = 'disabled'
+    mockLedgerDisplay.necessityStepMode = 'required'
+    const necessityRouter = makeRouter()
+    necessityRouter.push('/ledgers/ledger-1')
+    await necessityRouter.isReady()
+    const necessityWrapper = mountLedgerDetail(necessityRouter)
+    await vi.waitFor(() => expect(necessityWrapper.findAll('.transaction-context')).toHaveLength(3))
+    expect(necessityWrapper.findAll('.transaction-context').map((context) => context.text())).toEqual([
+      '不花不行',
+      '其实可以不花',
+      '不花不行',
+    ])
+    necessityWrapper.unmount()
+
+    mockLedgerDisplay.necessityStepMode = 'disabled'
+    const subjectRouter = makeRouter()
+    subjectRouter.push('/ledgers/ledger-1')
+    await subjectRouter.isReady()
+    const subjectWrapper = mountLedgerDetail(subjectRouter)
+    await vi.waitFor(() => expect(subjectWrapper.findAll('.transaction-context')).toHaveLength(3))
+    expect(subjectWrapper.findAll('.transaction-context').map((context) => context.text())).toEqual(['自己', '自己', '自己'])
   })
 })
