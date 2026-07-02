@@ -66,7 +66,7 @@
 
       <v-card v-if="budget" class="budget-panel" :class="budgetWarningClass" variant="outlined" rounded="lg">
         <v-card-text>
-          <strong>{{ t('budget.progress') }}</strong>
+          <strong>{{ t('budget.progress') }}（{{ budgetProgressPercentage }}）</strong>
           <p>{{ formatAmount(budget.progress.monthly_spent, ledger?.default_currency_code || '') }} / {{ formatAmount(budget.progress.monthly_total, ledger?.default_currency_code || '') }}</p>
           <v-progress-linear
             class="budget-progress"
@@ -120,12 +120,12 @@
                           <span v-if="transaction.note" class="transaction-note">{{ transaction.note }}</span>
                         </div>
                         <v-chip
-                          v-if="ledger?.necessity_step_mode !== 'disabled'"
-                          class="transaction-necessity"
+                          v-if="transactionContextLabel(transaction)"
+                          class="transaction-context"
                           size="x-small"
                           variant="tonal"
                         >
-                          {{ necessityLabel(transaction.necessity) }}
+                          {{ transactionContextLabel(transaction) }}
                         </v-chip>
                       </button>
                     </li>
@@ -220,6 +220,10 @@ const progressWidth = computed(() => {
   if (!budget.value) return 0
   return Math.min(100, Math.round(budget.value.progress.percentage * 100))
 })
+const budgetProgressPercentage = computed(() => {
+  if (!budget.value) return '0%'
+  return `${Math.round(budget.value.progress.percentage * 100)}%`
+})
 const budgetWarningClass = computed(() => ({
   soft: budget.value?.progress.warning === 'soft',
   over: budget.value?.progress.warning === 'over',
@@ -298,12 +302,12 @@ async function loadBudget() {
     budget.value = null
     return
   }
-  budget.value = await getBudget(ledgerId.value)
+  budget.value = await getBudget(ledgerId.value, monthRange.value.startDate)
 }
 
 async function changeMonth(delta: number) {
   selectedMonth.value = addMonths(selectedMonth.value, delta)
-  await loadTransactions()
+  await Promise.all([loadTransactions(), loadBudget()])
 }
 
 async function handleTransactionSaved() {
@@ -332,6 +336,23 @@ function transactionLabel(transaction: Transaction): string {
 
 function necessityLabel(value: string): string {
   return value === 'non-essential' ? t('transaction.nonEssential') : t('transaction.essential')
+}
+
+function transactionContextLabel(transaction: Transaction): string {
+  if (ledger.value?.location_step_mode && ledger.value.location_step_mode !== 'disabled') {
+    return transaction.location_name || '-'
+  }
+  if (ledger.value?.necessity_step_mode && ledger.value.necessity_step_mode !== 'disabled') {
+    return necessityLabel(transaction.necessity)
+  }
+  if (ledger.value?.subject_enabled && ledger.value.subject_step_mode !== 'disabled') {
+    return transaction.transaction_subjects
+      .map((subject) => subject.name)
+      .filter((name): name is string => !!name)
+      .map((name) => translateLabel(name, t))
+      .join(', ')
+  }
+  return ''
 }
 
 function startOfMonth(value: Date): Date {
@@ -602,7 +623,7 @@ p {
 .transaction-row strong,
 .transaction-name,
 .transaction-main,
-.transaction-necessity,
+.transaction-context,
 .transaction-note {
   min-width: 0;
   overflow: hidden;
@@ -627,14 +648,22 @@ p {
   gap: 3px;
 }
 
-.transaction-necessity,
+.transaction-context,
 .transaction-note,
 .muted {
   color: #607086;
 }
 
-.transaction-necessity {
+.transaction-context {
+  max-width: min(220px, 32vw);
   justify-self: end;
+}
+
+.transaction-context :deep(.v-chip__content) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .transaction-note {
@@ -727,12 +756,15 @@ p {
   }
 
   .transaction-row {
-    grid-template-columns: minmax(76px, auto) minmax(0, 1fr);
+    grid-template-columns: minmax(72px, auto) minmax(0, 1fr) minmax(0, auto);
   }
 
-  .transaction-necessity,
   .transaction-note {
     display: none;
+  }
+
+  .transaction-context {
+    max-width: 30vw;
   }
 
   .chart-layout {

@@ -14,6 +14,12 @@ export interface Budget {
   monthly_total: number
   annual_total: number | null
   is_enabled: boolean
+  categories?: Array<{
+    id: string
+    budget_id: string
+    category: string
+    amount: number
+  }>
   progress: BudgetProgress
 }
 
@@ -33,9 +39,11 @@ export async function saveBudget(ledgerId: string, payload: BudgetUpsertPayload)
   return response.data
 }
 
-export async function getBudget(ledgerId: string): Promise<Budget | null> {
+export async function getBudget(ledgerId: string, targetMonth?: string): Promise<Budget | null> {
   try {
-    const response = await apiClient.get<Budget>(`/ledgers/${ledgerId}/budget`)
+    const response = await apiClient.get<Budget>(`/ledgers/${ledgerId}/budget`, {
+      params: { target_month: targetMonth },
+    })
     return response.data
   } catch (error: any) {
     if (error.response?.status === 404) return null

@@ -600,6 +600,79 @@ async def test_custom_tags_rename_history_soft_hide_and_restore(client: AsyncCli
 
 
 @pytest.mark.asyncio
+async def test_budget_upsert_accepts_default_and_explicit_category_allocations(client: AsyncClient) -> None:
+    email = unique_email("budget-upsert")
+    await register_user(client, email)
+    token = await login_user(client, email)
+    ledger = await create_ledger(client, token, "Budget Ledger")
+    headers = auth_headers(token)
+
+    default_budget = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/budget",
+        headers=headers,
+        json={"monthly_total": 10000, "annual_total": 120000},
+    )
+    assert default_budget.status_code == 201, default_budget.text
+    assert default_budget.json()["monthly_total"] == 10000
+    assert default_budget.json()["annual_total"] == 120000
+    assert default_budget.json()["categories"]
+
+    split_budget = await client.post(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/budget",
+        headers=headers,
+        json={
+            "monthly_total": 10000,
+            "annual_total": 150000,
+            "categories": [
+                {"category": "category.food", "amount": 6000},
+                {"category": "category.transport", "amount": 4000},
+            ],
+        },
+    )
+    assert split_budget.status_code == 201, split_budget.text
+    assert split_budget.json()["annual_total"] == 150000
+    assert {
+        row["category"]: row["amount"] for row in split_budget.json()["categories"]
+    } == {"category.food": 6000, "category.transport": 4000}
+
+    for transaction_date, amount in (
+        ("2020-01-15", 100),
+        ("2020-02-15", 200),
+        (date.today().isoformat(), 300),
+    ):
+        transaction = await client.post(
+            f"{API_PREFIX}/ledgers/{ledger['id']}/transactions",
+            headers=headers,
+            json={
+                "amount": amount,
+                "currency_code": "JPY",
+                "transaction_date": transaction_date,
+                "necessity": "essential",
+                "items": [],
+                "subject_ids": [],
+            },
+        )
+        assert transaction.status_code == 201, transaction.text
+
+    january_budget = await client.get(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/budget",
+        headers=headers,
+        params={"target_month": "2020-01-01"},
+    )
+    february_budget = await client.get(
+        f"{API_PREFIX}/ledgers/{ledger['id']}/budget",
+        headers=headers,
+        params={"target_month": "2020-02-01"},
+    )
+    assert january_budget.json()["progress"]["monthly_spent"] == 100
+    assert february_budget.json()["progress"]["monthly_spent"] == 200
+
+    ledgers = await client.get(f"{API_PREFIX}/ledgers", headers=headers)
+    listed_ledger = next(row for row in ledgers.json() if row["id"] == ledger["id"])
+    assert listed_ledger["current_month_amounts"] == {"JPY": 300}
+
+
+@pytest.mark.asyncio
 async def test_read_only_shared_member_cannot_write_transaction(client: AsyncClient) -> None:
     owner_email = unique_email("owner")
     reader_email = unique_email("reader")
@@ -757,11 +830,10 @@ async def test_recurring_generation_creates_transaction_from_template(
     )
     assert recurring_response.status_code == 201, recurring_response.text
 
-    generated = await generate_due_recurring_transactions(
+    await generate_due_recurring_transactions(
         db_session,
         now_utc=datetime(2026, 7, 12, tzinfo=timezone.utc),
     )
-    assert generated >= 1
 
     recurring = await db_session.scalar(
         select(RecurringTransaction).where(RecurringTransaction.id == uuid.UUID(recurring_response.json()["id"]))

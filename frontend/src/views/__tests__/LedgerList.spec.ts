@@ -110,6 +110,7 @@ describe('LedgerList', () => {
       timezone: 'Asia/Tokyo',
       budget_enabled: false,
       total_amounts: { JPY: 1200 },
+      current_month_amounts: { JPY: 300 },
       created_at: '',
       updated_at: '',
     })
@@ -118,6 +119,7 @@ describe('LedgerList', () => {
 
     await vi.waitFor(() => expect(wrapper.text()).toContain('Home'))
     expect(wrapper.text()).toContain('¥')
+    expect(wrapper.text()).toContain('本月合计 300¥')
     expect(wrapper.find('.settings-icon-button svg').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('设置')
   })

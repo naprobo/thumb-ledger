@@ -282,6 +282,7 @@ export default {
     warning80: '80% of budget used',
     warning100: 'Over budget!',
     categoryOverWarning: 'Category budgets exceed the monthly total, but you can still save',
+    positiveAmountError: 'Enter a whole number greater than zero',
     progress: "This Month's Spending",
     disable: 'Disable Budget',
   },

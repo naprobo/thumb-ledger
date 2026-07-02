@@ -20,15 +20,37 @@
 
     <AppLoadingPanel v-if="isInitialLoading" class="budget-loading" />
 
-    <form v-else class="budget-form" @submit.prevent="nextOrSave">
+    <form v-else class="budget-form" novalidate @submit.prevent="nextOrSave">
       <section v-if="step === 0">
         <h2>{{ t('budget.monthly') }}</h2>
-        <input v-model.number="monthlyTotal" inputmode="numeric" min="1" type="number" required />
+        <input
+          v-model="monthlyInput"
+          inputmode="numeric"
+          min="1"
+          step="1"
+          type="number"
+          required
+          @focus="clearZeroInput('monthly')"
+          @input="handleMonthlyInput"
+          @blur="validateMonthly"
+        />
+        <p v-if="monthlyError" class="error field-error">{{ monthlyError }}</p>
       </section>
 
       <section v-else-if="step === 1">
         <h2>{{ t('budget.annual') }}</h2>
-        <input v-model.number="annualTotal" inputmode="numeric" min="1" type="number" />
+        <input
+          v-model="annualInput"
+          inputmode="numeric"
+          min="1"
+          step="1"
+          type="number"
+          required
+          @focus="clearZeroInput('annual')"
+          @input="handleAnnualInput"
+          @blur="validateAnnual"
+        />
+        <p v-if="annualError" class="error field-error">{{ annualError }}</p>
         <button type="button" @click="skipAnnual">{{ t('budget.skipDefault') }}</button>
       </section>
 
@@ -46,7 +68,7 @@
         <div class="category-grid">
           <label v-for="category in categories" :key="category.id">
             <span>{{ translateLabel(category.name, t) }}</span>
-            <input v-model.number="categoryAmounts[category.name]" inputmode="numeric" min="0" type="number" />
+            <input v-model.number="categoryAmounts[category.name]" inputmode="numeric" min="0" step="1" type="number" />
           </label>
         </div>
         <p v-if="categoryTotal > monthlyTotal" class="warning">{{ t('budget.categoryOverWarning') }}</p>
@@ -71,7 +93,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft } from '@lucide/vue'
 
-import { saveBudget } from '@/api/budget'
+import { getBudget, saveBudget } from '@/api/budget'
 import { listCategories, type Category } from '@/api/ledgers'
 import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { translateLabel } from '@/i18n/labels'
@@ -81,8 +103,11 @@ const route = useRoute()
 const router = useRouter()
 const ledgerId = computed(() => String(route.params.id))
 const step = ref(0)
-const monthlyTotal = ref<number>(0)
-const annualTotal = ref<number | null>(null)
+const monthlyInput = ref<string | number>('')
+const annualInput = ref<string | number>('')
+const annualManuallyEdited = ref(false)
+const monthlyError = ref('')
+const annualError = ref('')
 const splitByCategory = ref(false)
 const categories = ref<Category[]>([])
 const categoryAmounts = reactive<Record<string, number>>({})
@@ -91,51 +116,74 @@ const isSaving = ref(false)
 const statusMessage = ref('')
 const errorMessage = ref('')
 
+const monthlyTotal = computed(() => parsePositiveInteger(monthlyInput.value) || 0)
+const annualTotal = computed(() => parsePositiveInteger(annualInput.value) || 0)
 const categoryTotal = computed(() => Object.values(categoryAmounts).reduce((sum, value) => sum + (Number(value) || 0), 0))
 const canContinue = computed(() => {
   if (step.value === 0) return monthlyTotal.value > 0
+  if (step.value === 1) return annualTotal.value > 0
   return true
 })
 
 onMounted(async () => {
   try {
-    categories.value = await listCategories(ledgerId.value)
-    applyDefaultCategoryAmounts()
+    const [categoryRows, budget] = await Promise.all([
+      listCategories(ledgerId.value),
+      getBudget(ledgerId.value),
+    ])
+    categories.value = categoryRows
+    if (budget) {
+      monthlyInput.value = String(budget.monthly_total)
+      annualInput.value = String(budget.annual_total || budget.monthly_total * 12)
+      annualManuallyEdited.value = budget.annual_total !== budget.monthly_total * 12
+      for (const category of budget.categories || []) {
+        categoryAmounts[category.category] = category.amount
+      }
+    }
   } finally {
     isInitialLoading.value = false
   }
 })
 
-function applyDefaultCategoryAmounts() {
+function applyDefaultCategoryAmounts(force = false) {
   if (!monthlyTotal.value || categories.value.length === 0) return
   const amount = Math.floor(monthlyTotal.value / categories.value.length)
   for (const category of categories.value) {
-    categoryAmounts[category.name] = categoryAmounts[category.name] ?? amount
+    if (force || categoryAmounts[category.name] === undefined) {
+      categoryAmounts[category.name] = amount
+    }
   }
 }
 
 function skipAnnual() {
-  annualTotal.value = null
+  annualInput.value = String(monthlyTotal.value * 12)
+  annualManuallyEdited.value = false
+  annualError.value = ''
   step.value = 2
 }
 
-function skipCategorySplit() {
+async function skipCategorySplit() {
   splitByCategory.value = false
-  submitBudget()
+  await submitBudget()
 }
 
 async function nextOrSave() {
   if (step.value === 0) {
-    applyDefaultCategoryAmounts()
+    if (!validateMonthly()) return
+    if (!annualManuallyEdited.value) {
+      annualInput.value = String(monthlyTotal.value * 12)
+    }
+    applyDefaultCategoryAmounts(false)
     step.value = 1
     return
   }
   if (step.value === 1) {
+    if (!validateAnnual()) return
     step.value = 2
     return
   }
   if (step.value === 2 && splitByCategory.value) {
-    applyDefaultCategoryAmounts()
+    applyDefaultCategoryAmounts(false)
     step.value = 3
     return
   }
@@ -143,13 +191,13 @@ async function nextOrSave() {
 }
 
 async function submitBudget() {
-  if (!monthlyTotal.value) return
+  if (!validateMonthly() || !validateAnnual() || !validateCategoryAmounts()) return
   isSaving.value = true
   errorMessage.value = ''
   try {
     await saveBudget(ledgerId.value, {
       monthly_total: monthlyTotal.value,
-      annual_total: annualTotal.value || undefined,
+      annual_total: annualTotal.value,
       categories: splitByCategory.value
         ? categories.value.map((category) => ({
             category: category.name,
@@ -164,6 +212,59 @@ async function submitBudget() {
   } finally {
     isSaving.value = false
   }
+}
+
+function handleMonthlyInput() {
+  monthlyError.value = ''
+  if (!annualManuallyEdited.value) {
+    const monthly = parsePositiveInteger(monthlyInput.value)
+    annualInput.value = monthly ? String(monthly * 12) : ''
+  }
+}
+
+function handleAnnualInput() {
+  annualManuallyEdited.value = true
+  annualError.value = ''
+}
+
+function clearZeroInput(field: 'monthly' | 'annual') {
+  if (field === 'monthly' && Number(monthlyInput.value) === 0) monthlyInput.value = ''
+  if (field === 'annual' && Number(annualInput.value) === 0) annualInput.value = ''
+}
+
+function parsePositiveInteger(value: string | number): number | null {
+  const normalized = String(value).trim()
+  if (!/^\d+$/.test(normalized)) return null
+  const amount = Number(normalized)
+  return Number.isSafeInteger(amount) && amount > 0 ? amount : null
+}
+
+function validateMonthly(): boolean {
+  if (parsePositiveInteger(monthlyInput.value)) {
+    monthlyError.value = ''
+    return true
+  }
+  monthlyError.value = t('budget.positiveAmountError')
+  return false
+}
+
+function validateAnnual(): boolean {
+  if (parsePositiveInteger(annualInput.value)) {
+    annualError.value = ''
+    return true
+  }
+  annualError.value = t('budget.positiveAmountError')
+  return false
+}
+
+function validateCategoryAmounts(): boolean {
+  if (!splitByCategory.value) return true
+  const isValid = categories.value.every((category) => {
+    const amount = Number(categoryAmounts[category.name])
+    return Number.isSafeInteger(amount) && amount >= 0
+  })
+  if (!isValid) errorMessage.value = t('errors.validationError')
+  return isValid
 }
 
 async function skipBudget() {
@@ -275,5 +376,10 @@ button {
 
 .status {
   color: #166534;
+}
+
+.field-error {
+  margin: -6px 0 0;
+  font-size: 0.9rem;
 }
 </style>
