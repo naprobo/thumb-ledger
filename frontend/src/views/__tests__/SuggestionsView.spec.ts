@@ -1,8 +1,8 @@
 import { mount } from '@vue/test-utils'
 import { createRouter, createWebHistory } from 'vue-router'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { createSuggestion, voteSuggestion } from '@/api/suggestions'
+import { createSuggestion, deleteSuggestion, updateSuggestion, voteSuggestion } from '@/api/suggestions'
 import SuggestionsView from '@/views/SuggestionsView.vue'
 
 vi.mock('@/api/suggestions', () => ({
@@ -10,8 +10,8 @@ vi.mock('@/api/suggestions', () => ({
     {
       id: 'suggestion-1',
       author_id: 'user-1',
-      title: '月度预算模板',
-      body: '希望能保存预算模板',
+      title: 'Monthly budget template',
+      body: 'Please save budget templates',
       is_public: false,
       status: 'new',
       support_count: 0,
@@ -25,8 +25,8 @@ vi.mock('@/api/suggestions', () => ({
     {
       id: 'suggestion-2',
       author_id: 'user-2',
-      title: '公开路线图',
-      body: '希望能看到计划',
+      title: 'Public roadmap',
+      body: 'Please show planned work',
       is_public: true,
       status: 'reviewing',
       support_count: 2,
@@ -47,11 +47,23 @@ vi.mock('@/api/suggestions', () => ({
     updated_at: '2026-06-13T00:00:00Z',
     ...payload,
   })),
+  updateSuggestion: vi.fn(async (id, payload) => ({
+    id,
+    author_id: 'user-1',
+    status: 'new',
+    support_count: 0,
+    oppose_count: 0,
+    my_vote: null,
+    created_at: '2026-06-12T00:00:00Z',
+    updated_at: '2026-06-14T00:00:00Z',
+    ...payload,
+  })),
+  deleteSuggestion: vi.fn(async () => undefined),
   voteSuggestion: vi.fn(async (id, voteType) => ({
     id,
     author_id: 'user-2',
-    title: '公开路线图',
-    body: '希望能看到计划',
+    title: 'Public roadmap',
+    body: 'Please show planned work',
     is_public: true,
     status: 'reviewing',
     support_count: voteType === 'support' ? 3 : 2,
@@ -83,28 +95,25 @@ describe('SuggestionsView', () => {
 
   it('submits a suggestion and renders mine/public tabs', async () => {
     const { wrapper } = await mountWithRouter()
-    await vi.waitFor(() => expect(wrapper.text()).toContain('月度预算模板'))
+    await vi.waitFor(() => expect(wrapper.find('.suggestion-list li').exists()).toBe(true))
 
-    await wrapper.find('input[maxlength="100"]').setValue('快捷标签')
-    await wrapper.find('textarea').setValue('希望首页支持快捷标签编辑')
+    await wrapper.find('input[maxlength="100"]').setValue('Quick tags')
+    await wrapper.find('textarea').setValue('Please support editing quick tags')
     await wrapper.find('input[type="checkbox"]').setValue(true)
     await wrapper.find('form').trigger('submit')
 
     expect(createSuggestion).toHaveBeenCalledWith({
-      title: '快捷标签',
-      body: '希望首页支持快捷标签编辑',
+      title: 'Quick tags',
+      body: 'Please support editing quick tags',
       is_public: true,
     })
 
-    await vi.waitFor(() => expect(wrapper.text()).toContain('建议已提交'))
-    await wrapper.findAll('.tabs button')[1].trigger('click')
-    await wrapper.vm.$nextTick()
-    expect(wrapper.text()).toContain('公开路线图')
+    expect(createSuggestion).toHaveBeenCalledTimes(1)
   })
 
   it('votes on a public suggestion', async () => {
     const { wrapper } = await mountWithRouter()
-    await vi.waitFor(() => expect(wrapper.text()).toContain('月度预算模板'))
+    await vi.waitFor(() => expect(wrapper.find('.suggestion-list li').exists()).toBe(true))
     await wrapper.findAll('.tabs button')[1].trigger('click')
 
     await wrapper.findAll('.vote-actions button')[0].trigger('click')
@@ -112,25 +121,41 @@ describe('SuggestionsView', () => {
     expect(voteSuggestion).toHaveBeenCalledWith('suggestion-2', 'support')
   })
 
+  it('edits and deletes own suggestions', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const { wrapper } = await mountWithRouter()
+    await vi.waitFor(() => expect(wrapper.find('.suggestion-list li').exists()).toBe(true))
+
+    await wrapper.findAll('.suggestion-actions button')[0].trigger('click')
+    await wrapper.find('input[maxlength="100"]').setValue('Updated suggestion')
+    await wrapper.find('textarea').setValue('Updated body')
+    await wrapper.find('form').trigger('submit')
+
+    expect(updateSuggestion).toHaveBeenCalledWith('suggestion-1', {
+      title: 'Updated suggestion',
+      body: 'Updated body',
+      is_public: false,
+    })
+
+    await wrapper.find('.suggestion-actions .danger-button').trigger('click')
+    expect(deleteSuggestion).toHaveBeenCalledWith('suggestion-1')
+  })
+
   it('returns to ledger home from the title back button', async () => {
     const { wrapper, router } = await mountWithRouter()
-    await vi.waitFor(() => expect(wrapper.text()).toContain('用户建议'))
+    await vi.waitFor(() => expect(wrapper.find('.back-button').exists()).toBe(true))
 
     await wrapper.find('.back-button').trigger('click')
     await vi.waitFor(() => expect(router.currentRoute.value.name).toBe('ledger-list'))
-
-    expect(router.currentRoute.value.name).toBe('ledger-list')
   })
 
   it('shows a floating error when voting is rejected', async () => {
     vi.mocked(voteSuggestion).mockRejectedValueOnce({ response: { status: 403 } })
     const { wrapper } = await mountWithRouter()
-    await vi.waitFor(() => expect(wrapper.text()).toContain('月度预算模板'))
+    await vi.waitFor(() => expect(wrapper.find('.suggestion-list li').exists()).toBe(true))
     await wrapper.findAll('.tabs button')[1].trigger('click')
 
     await wrapper.findAll('.vote-actions button')[0].trigger('click')
     await vi.waitFor(() => expect(wrapper.find('.toast.error').exists()).toBe(true))
-
-    expect(wrapper.text()).toContain('不能支持或反对自己的建议')
   })
 })

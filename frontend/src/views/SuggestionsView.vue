@@ -24,7 +24,7 @@
     </div>
 
     <section class="submit-panel">
-      <h2>{{ t('suggestions.submit') }}</h2>
+      <h2>{{ editingSuggestionId ? t('common.edit') : t('suggestions.submit') }}</h2>
       <form @submit.prevent="submitSuggestion">
         <label>
           <span>{{ t('suggestions.subject') }}</span>
@@ -38,9 +38,14 @@
           <input v-model="draft.is_public" type="checkbox" />
           <span>{{ t('suggestions.makePublic') }}</span>
         </label>
-        <button class="primary-button" type="submit" :disabled="isSubmitting || !canSubmit">
-          {{ t('suggestions.submit') }}
-        </button>
+        <div class="form-actions">
+          <button v-if="editingSuggestionId" type="button" @click="cancelEdit">
+            {{ t('common.cancel') }}
+          </button>
+          <button class="primary-button" type="submit" :disabled="isSubmitting || !canSubmit">
+            {{ editingSuggestionId ? t('common.save') : t('suggestions.submit') }}
+          </button>
+        </div>
       </form>
     </section>
 
@@ -63,7 +68,26 @@
             <p>{{ suggestion.body }}</p>
             <span>{{ statusLabel(suggestion.status) }} · {{ formatDate(suggestion.created_at) }}</span>
           </div>
-          <div class="vote-actions">
+          <div v-if="activeTab === 'mine'" class="suggestion-actions">
+            <button
+              type="button"
+              :aria-label="t('common.edit')"
+              :title="t('common.edit')"
+              @click="startEdit(suggestion)"
+            >
+              <Pencil :size="18" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              class="danger-button"
+              :aria-label="t('admin.delete')"
+              :title="t('admin.delete')"
+              @click="removeSuggestion(suggestion)"
+            >
+              <Trash2 :size="18" aria-hidden="true" />
+            </button>
+          </div>
+          <div v-else class="vote-actions">
             <button
               type="button"
               :class="{ selected: suggestion.my_vote === 'support' }"
@@ -93,12 +117,14 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { ChevronLeft, RefreshCw } from '@lucide/vue'
+import { ChevronLeft, Pencil, RefreshCw, Trash2 } from '@lucide/vue'
 
 import {
   createSuggestion,
+  deleteSuggestion,
   listMySuggestions,
   listPublicSuggestions,
+  updateSuggestion,
   voteSuggestion,
   type Suggestion,
   type SuggestionStatus,
@@ -114,6 +140,7 @@ const publicSuggestions = ref<Suggestion[]>([])
 const isInitialLoading = ref(true)
 const isRefreshing = ref(false)
 const isSubmitting = ref(false)
+const editingSuggestionId = ref('')
 const toastMessage = ref('')
 const toastKind = ref<'success' | 'error'>('success')
 let toastTimer: number | undefined
@@ -146,11 +173,14 @@ async function submitSuggestion() {
   if (!canSubmit.value) return
   isSubmitting.value = true
   try {
-    await createSuggestion({ ...draft })
-    draft.title = ''
-    draft.body = ''
-    draft.is_public = false
-    showToast(t('suggestions.submitted'), 'success')
+    if (editingSuggestionId.value) {
+      await updateSuggestion(editingSuggestionId.value, { ...draft })
+      showToast(t('common.saved'), 'success')
+    } else {
+      await createSuggestion({ ...draft })
+      showToast(t('suggestions.submitted'), 'success')
+    }
+    resetDraft()
     await refresh()
     activeTab.value = 'mine'
   } catch {
@@ -158,6 +188,38 @@ async function submitSuggestion() {
   } finally {
     isSubmitting.value = false
   }
+}
+
+function startEdit(suggestion: Suggestion) {
+  editingSuggestionId.value = suggestion.id
+  draft.title = suggestion.title
+  draft.body = suggestion.body
+  draft.is_public = suggestion.is_public
+  activeTab.value = 'mine'
+}
+
+function cancelEdit() {
+  resetDraft()
+}
+
+async function removeSuggestion(suggestion: Suggestion) {
+  if (!window.confirm(t('suggestions.deleteConfirm'))) return
+  try {
+    await deleteSuggestion(suggestion.id)
+    if (editingSuggestionId.value === suggestion.id) resetDraft()
+    mySuggestions.value = mySuggestions.value.filter((item) => item.id !== suggestion.id)
+    publicSuggestions.value = publicSuggestions.value.filter((item) => item.id !== suggestion.id)
+    showToast(t('suggestions.deleted'), 'success')
+  } catch {
+    showToast(t('errors.validationError'), 'error')
+  }
+}
+
+function resetDraft() {
+  editingSuggestionId.value = ''
+  draft.title = ''
+  draft.body = ''
+  draft.is_public = false
 }
 
 async function vote(suggestion: Suggestion, voteType: SuggestionVoteType) {
@@ -197,7 +259,9 @@ function showToast(message: string, kind: 'success' | 'error') {
 .topbar,
 .title-row,
 .tabs,
-.vote-actions {
+.vote-actions,
+.form-actions,
+.suggestion-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -337,6 +401,24 @@ button:disabled {
 
 .tabs {
   justify-content: start;
+}
+
+.form-actions {
+  justify-content: end;
+}
+
+.suggestion-actions button {
+  display: inline-grid;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  place-items: center;
+  padding: 0;
+}
+
+.danger-button {
+  color: #b42318;
 }
 
 .suggestion-list {

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.suggestion import Suggestion, SuggestionVote
 from app.models.user import User
-from app.schemas.suggestion import SuggestionCreateRequest, SuggestionResponse, SuggestionVoteRequest
+from app.schemas.suggestion import SuggestionCreateRequest, SuggestionResponse, SuggestionUpdateRequest, SuggestionVoteRequest
 from app.services.auth import get_current_user
 
 router = APIRouter(prefix="/suggestions", tags=["suggestions"])
@@ -110,6 +110,38 @@ async def public_suggestions(
         select(Suggestion).where(Suggestion.is_public.is_(True)).order_by(Suggestion.created_at.desc())
     )
     return await _responses(db, list(result.scalars().all()), current_user)
+
+
+@router.patch("/{suggestion_id}", response_model=SuggestionResponse)
+async def update_suggestion(
+    suggestion_id: uuid.UUID,
+    payload: SuggestionUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> SuggestionResponse:
+    suggestion = await db.get(Suggestion, suggestion_id)
+    if suggestion is None or suggestion.author_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found")
+    suggestion.title = payload.title
+    suggestion.body = payload.body
+    suggestion.is_public = payload.is_public
+    await db.flush()
+    await db.refresh(suggestion)
+    return (await _responses(db, [suggestion], current_user))[0]
+
+
+@router.delete("/{suggestion_id}")
+async def delete_suggestion(
+    suggestion_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, str]:
+    suggestion = await db.get(Suggestion, suggestion_id)
+    if suggestion is None or suggestion.author_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found")
+    await db.delete(suggestion)
+    await db.flush()
+    return {"detail": "Suggestion deleted successfully."}
 
 
 @router.post("/{suggestion_id}/vote", response_model=SuggestionResponse)

@@ -1044,3 +1044,53 @@ async def test_suggestion_flow_public_vote_unique_and_admin_status(
     )
     assert update_status.status_code == 200, update_status.text
     assert update_status.json()["status"] == "planned"
+
+
+@pytest.mark.asyncio
+async def test_suggestion_author_can_update_and_delete_own_suggestion(client: AsyncClient) -> None:
+    author_email = unique_email("suggestion-edit-author")
+    other_email = unique_email("suggestion-edit-other")
+    await register_user(client, author_email)
+    await register_user(client, other_email)
+    author_token = await login_user(client, author_email)
+    other_token = await login_user(client, other_email)
+
+    created = await client.post(
+        f"{API_PREFIX}/suggestions",
+        headers=auth_headers(author_token),
+        json={"title": "Original", "body": "Original body", "is_public": False},
+    )
+    assert created.status_code == 201, created.text
+    suggestion_id = created.json()["id"]
+
+    forbidden_update = await client.patch(
+        f"{API_PREFIX}/suggestions/{suggestion_id}",
+        headers=auth_headers(other_token),
+        json={"title": "Other", "body": "Other body", "is_public": True},
+    )
+    assert forbidden_update.status_code == 404
+
+    updated = await client.patch(
+        f"{API_PREFIX}/suggestions/{suggestion_id}",
+        headers=auth_headers(author_token),
+        json={"title": "Updated", "body": "Updated body", "is_public": True},
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["title"] == "Updated"
+    assert updated.json()["body"] == "Updated body"
+    assert updated.json()["is_public"] is True
+
+    forbidden_delete = await client.delete(
+        f"{API_PREFIX}/suggestions/{suggestion_id}",
+        headers=auth_headers(other_token),
+    )
+    assert forbidden_delete.status_code == 404
+
+    deleted = await client.delete(
+        f"{API_PREFIX}/suggestions/{suggestion_id}",
+        headers=auth_headers(author_token),
+    )
+    assert deleted.status_code == 200, deleted.text
+
+    mine = await client.get(f"{API_PREFIX}/suggestions/mine", headers=auth_headers(author_token))
+    assert suggestion_id not in {item["id"] for item in mine.json()}

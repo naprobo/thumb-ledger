@@ -23,9 +23,20 @@ export interface SuggestionCreatePayload {
   is_public: boolean
 }
 
+export type SuggestionUpdatePayload = SuggestionCreatePayload
+
 export async function createSuggestion(payload: SuggestionCreatePayload): Promise<Suggestion> {
   const response = await apiClient.post<Suggestion>('/suggestions', payload)
   return response.data
+}
+
+export async function updateSuggestion(suggestionId: string, payload: SuggestionUpdatePayload): Promise<Suggestion> {
+  const response = await apiClient.patch<Suggestion>(`/suggestions/${suggestionId}`, payload)
+  return response.data
+}
+
+export async function deleteSuggestion(suggestionId: string): Promise<void> {
+  await apiClient.delete(`/suggestions/${suggestionId}`)
 }
 
 export async function listMySuggestions(): Promise<Suggestion[]> {

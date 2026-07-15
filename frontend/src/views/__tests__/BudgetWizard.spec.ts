@@ -3,9 +3,11 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getBudget, saveBudget } from '@/api/budget'
+import { getLedger } from '@/api/ledgers'
 import BudgetWizard from '@/views/BudgetWizard.vue'
 
 vi.mock('@/api/ledgers', () => ({
+  getLedger: vi.fn(),
   listCategories: vi.fn(async () => [
     { id: 'cat-1', ledger_id: 'ledger-1', name: 'category.food', is_system: true, display_order: 0 },
     { id: 'cat-2', ledger_id: 'ledger-1', name: 'category.transport', is_system: true, display_order: 1 },
@@ -21,6 +23,20 @@ describe('BudgetWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(getBudget).mockResolvedValue(null)
+    vi.mocked(getLedger).mockResolvedValue({
+      id: 'ledger-1',
+      owner_id: 'user-1',
+      name: 'Home',
+      entry_mode: 'receipt',
+      subject_enabled: false,
+      subject_step_mode: 'disabled',
+      necessity_step_mode: 'required',
+      default_currency_code: 'JPY',
+      timezone: 'Asia/Tokyo',
+      budget_enabled: true,
+      created_at: '',
+      updated_at: '',
+    })
   })
 
   it('uses numeric input for each budget amount step', async () => {
@@ -37,11 +53,11 @@ describe('BudgetWizard', () => {
 
     const wrapper = mount(BudgetWizard, { global: { plugins: [router] } })
 
-    await vi.waitFor(() => expect(wrapper.find('input[inputmode="numeric"]').exists()).toBe(true))
-    await wrapper.find('input[inputmode="numeric"]').setValue('10000')
+    await vi.waitFor(() => expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(true))
+    await wrapper.find('input[inputmode="decimal"]').setValue('10000')
     await wrapper.find('form').trigger('submit')
-    expect(wrapper.find('input[inputmode="numeric"]').exists()).toBe(true)
-    expect((wrapper.find('input[inputmode="numeric"]').element as HTMLInputElement).value).toBe('120000')
+    expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(true)
+    expect((wrapper.find('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('120000')
   })
 
   it('starts monthly budget empty and validates non-positive values', async () => {
@@ -56,9 +72,9 @@ describe('BudgetWizard', () => {
     router.push('/ledgers/ledger-1/budget')
     await router.isReady()
     const wrapper = mount(BudgetWizard, { global: { plugins: [router] } })
-    await vi.waitFor(() => expect(wrapper.find('input[inputmode="numeric"]').exists()).toBe(true))
+    await vi.waitFor(() => expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(true))
 
-    const input = wrapper.find('input[inputmode="numeric"]')
+    const input = wrapper.find('input[inputmode="decimal"]')
     expect((input.element as HTMLInputElement).value).toBe('')
     await input.setValue('0')
     await input.trigger('focus')
@@ -95,11 +111,11 @@ describe('BudgetWizard', () => {
     router.push('/ledgers/ledger-1/budget')
     await router.isReady()
     const wrapper = mount(BudgetWizard, { global: { plugins: [router] } })
-    await vi.waitFor(() => expect(wrapper.find('input[inputmode="numeric"]').exists()).toBe(true))
+    await vi.waitFor(() => expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(true))
 
-    expect((wrapper.find('input[inputmode="numeric"]').element as HTMLInputElement).value).toBe('5000')
+    expect((wrapper.find('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('5000')
     await wrapper.find('form').trigger('submit')
-    expect((wrapper.find('input[inputmode="numeric"]').element as HTMLInputElement).value).toBe('65000')
+    expect((wrapper.find('input[inputmode="decimal"]').element as HTMLInputElement).value).toBe('65000')
   })
 
   it('keeps a manually edited annual budget and submits from category choice step', async () => {
@@ -114,11 +130,11 @@ describe('BudgetWizard', () => {
     router.push('/ledgers/ledger-1/budget')
     await router.isReady()
     const wrapper = mount(BudgetWizard, { global: { plugins: [router] } })
-    await vi.waitFor(() => expect(wrapper.find('input[inputmode="numeric"]').exists()).toBe(true))
+    await vi.waitFor(() => expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(true))
 
-    await wrapper.find('input[inputmode="numeric"]').setValue('100')
+    await wrapper.find('input[inputmode="decimal"]').setValue('100')
     await wrapper.find('form').trigger('submit')
-    await wrapper.find('input[inputmode="numeric"]').setValue('1500')
+    await wrapper.find('input[inputmode="decimal"]').setValue('1500')
     await wrapper.find('form').trigger('submit')
     await wrapper.find('section button').trigger('click')
 
@@ -143,17 +159,59 @@ describe('BudgetWizard', () => {
     await router.isReady()
     const wrapper = mount(BudgetWizard, { global: { plugins: [router] } })
 
-    await vi.waitFor(() => expect(wrapper.find('input[inputmode="numeric"]').exists()).toBe(true))
-    await wrapper.find('input[inputmode="numeric"]').setValue('100')
+    await vi.waitFor(() => expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(true))
+    await wrapper.find('input[inputmode="decimal"]').setValue('100')
     await wrapper.find('form').trigger('submit')
     await wrapper.find('form').trigger('submit')
     await wrapper.find('input[type="checkbox"]').setValue(true)
     await wrapper.find('form').trigger('submit')
-    const categoryInputs = wrapper.findAll('input[inputmode="numeric"]')
+    const categoryInputs = wrapper.findAll('input[inputmode="decimal"]')
     await categoryInputs[0].setValue('80')
     await categoryInputs[1].setValue('80')
 
     expect(wrapper.text()).toContain('分类预算合计已超过月度总预算')
     expect(wrapper.find('.primary-button').attributes('disabled')).toBeUndefined()
+  })
+
+  it('submits decimal-currency budgets in minor units and displays major units', async () => {
+    vi.mocked(getLedger).mockReset()
+    vi.mocked(getLedger).mockResolvedValue({
+      id: 'ledger-1',
+      owner_id: 'user-1',
+      name: 'USD Home',
+      entry_mode: 'receipt',
+      subject_enabled: false,
+      subject_step_mode: 'disabled',
+      necessity_step_mode: 'required',
+      default_currency_code: 'USD',
+      timezone: 'Asia/Tokyo',
+      budget_enabled: true,
+      created_at: '',
+      updated_at: '',
+    })
+    const router = createRouter({
+      history: createWebHistory(),
+      routes: [
+        { path: '/ledgers/:id/budget', name: 'budget-wizard', component: BudgetWizard },
+        { path: '/ledgers/:id', name: 'ledger-detail', component: { template: '<div />' } },
+        { path: '/ledgers/:id/settings', name: 'ledger-settings', component: { template: '<div />' } },
+      ],
+    })
+    router.push('/ledgers/ledger-1/budget')
+    await router.isReady()
+    const wrapper = mount(BudgetWizard, { global: { plugins: [router] } })
+    await vi.waitFor(() => expect(wrapper.find('input[inputmode="decimal"]').exists()).toBe(true))
+
+    await wrapper.find('input[inputmode="decimal"]').setValue('5000')
+    await wrapper.find('form').trigger('submit')
+    await wrapper.find('form').trigger('submit')
+    await wrapper.find('section button').trigger('click')
+
+    await vi.waitFor(() => expect(saveBudget).toHaveBeenCalledTimes(1))
+    expect(saveBudget).toHaveBeenCalledWith('ledger-1', {
+      monthly_total: 500000,
+      annual_total: 6000000,
+      categories: undefined,
+    })
   })
 })
