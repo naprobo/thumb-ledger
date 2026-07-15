@@ -305,6 +305,8 @@ export default {
     oppose: '反对',
     empty: '暂无建议',
     submitted: '建议已提交',
+    deleted: '建议已删除',
+    deleteConfirm: '确定删除这条建议吗？',
     ownVoteForbidden: '不能支持或反对自己的建议',
     author: '提交用户',
     statusLabel: '处理状态',

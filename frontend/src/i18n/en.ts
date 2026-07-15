@@ -393,6 +393,8 @@ export default {
     oppose: 'Oppose',
     empty: 'No suggestions yet',
     submitted: 'Suggestion submitted',
+    deleted: 'Suggestion deleted',
+    deleteConfirm: 'Delete this suggestion?',
     ownVoteForbidden: 'You cannot vote on your own suggestion',
     author: 'Author',
     statusLabel: 'Status',

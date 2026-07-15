@@ -64,7 +64,7 @@
         <div class="grid-two">
           <label>
             <span>{{ t('transaction.amount') }} ({{ getCurrencySymbol(ledger?.default_currency_code || 'JPY') }})</span>
-            <input v-model.number="draft.amount" inputmode="numeric" min="1" type="number" required />
+            <input v-model="draft.amountInput" inputmode="decimal" min="1" :step="amountStep" type="number" required />
           </label>
           <label>
             <span>{{ t('recurring.interval') }}</span>
@@ -188,7 +188,7 @@ import type { Necessity } from '@/api/transactions'
 import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { translateLabel } from '@/i18n/labels'
 import { useLedgerStore } from '@/stores/ledgers'
-import { formatMoney, getCurrencySymbol } from '@/utils/money'
+import { currencyFractionDigits, formatMoney, formatMoneyInputValue, getCurrencySymbol, parseMoneyInputValue } from '@/utils/money'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -208,7 +208,7 @@ let toastTimer: number | undefined
 
 const draft = reactive({
   editing_id: '',
-  amount: 0,
+  amountInput: '',
   interval: 'monthly' as RecurringInterval,
   next_run_date: formatDate(new Date()),
   category_name: 'category.other',
@@ -216,7 +216,9 @@ const draft = reactive({
   necessity: 'essential' as Necessity,
 })
 
-const canSubmit = computed(() => draft.amount > 0 && !!draft.next_run_date && !!draft.category_name)
+const amountStep = computed(() => (currencyFractionDigits(ledger.value?.default_currency_code || 'JPY') === 0 ? '1' : '0.01'))
+const draftAmount = computed(() => (ledger.value ? parseDraftAmount(draft.amountInput, ledger.value.default_currency_code) : 0))
+const canSubmit = computed(() => draftAmount.value > 0 && !!draft.next_run_date && !!draft.category_name)
 
 onMounted(async () => {
   try {
@@ -249,20 +251,21 @@ async function loadRecurring() {
 
 async function submitRecurring() {
   if (!canSubmit.value || !ledger.value) return
+  const amount = draftAmount.value
   isSaving.value = true
   try {
     const payload = {
       interval: draft.interval,
       next_run_date: draft.next_run_date,
       template_data: {
-        amount: draft.amount,
+        amount,
         currency_code: ledger.value.default_currency_code,
         necessity: draft.necessity,
         items: [
           {
             category_name: draft.category_name,
             item_name: draft.item_name || undefined,
-            amount: draft.amount,
+            amount,
             currency_code: ledger.value.default_currency_code,
           },
         ],
@@ -307,7 +310,7 @@ async function deleteRecurring(recurringId: string) {
 
 function resetDraft() {
   draft.editing_id = ''
-  draft.amount = 0
+  draft.amountInput = ''
   draft.interval = 'monthly'
   draft.next_run_date = formatDate(new Date())
   draft.category_name = categories.value[0]?.name || 'category.other'
@@ -328,7 +331,10 @@ function cancelForm() {
 function startEdit(template: RecurringTemplate) {
   const item = template.template_data.items?.[0]
   draft.editing_id = template.id
-  draft.amount = template.template_data.amount
+  draft.amountInput = formatMoneyInputValue(
+    template.template_data.amount,
+    template.template_data.currency_code || ledger.value?.default_currency_code || 'JPY',
+  )
   draft.interval = template.interval
   draft.next_run_date = template.next_run_date
   draft.category_name = item?.category_name || categories.value[0]?.name || 'category.other'
@@ -348,6 +354,15 @@ function intervalLabel(interval: RecurringInterval): string {
 
 function formatAmount(amount: number, currencyCode: string): string {
   return formatMoney(amount, currencyCode)
+}
+
+function parseDraftAmount(value: string | number, currencyCode: string): number {
+  const normalized = String(value).trim()
+  if (!normalized) return 0
+  const fractionDigits = currencyFractionDigits(currencyCode)
+  const pattern = fractionDigits === 0 ? /^\d+$/ : new RegExp(`^\\d+(?:\\.\\d{1,${fractionDigits}})?$`)
+  if (!pattern.test(normalized)) return 0
+  return parseMoneyInputValue(normalized, currencyCode)
 }
 
 function formatDate(value: Date): string {

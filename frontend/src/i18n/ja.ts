@@ -305,6 +305,8 @@ export default {
     oppose: '反対',
     empty: '提案はありません',
     submitted: '提案を送信しました',
+    deleted: '提案を削除しました',
+    deleteConfirm: 'この提案を削除しますか？',
     ownVoteForbidden: '自分の提案には投票できません',
     author: '投稿者',
     statusLabel: '状態',
