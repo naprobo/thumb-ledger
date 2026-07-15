@@ -18,6 +18,12 @@ class SuggestionCreateRequest(BaseModel):
     is_public: bool = False
 
 
+class SuggestionUpdateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=100)
+    body: str = Field(..., min_length=1, max_length=2000)
+    is_public: bool = False
+
+
 class SuggestionVoteRequest(BaseModel):
     vote_type: SuggestionVoteType
 

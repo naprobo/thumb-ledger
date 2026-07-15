@@ -50,7 +50,7 @@ export function formatMoneyWithTrailingSymbol(amount: number, currencyCode: stri
 }
 
 export function formatMoneyInputValue(amount: number, currencyCode: string): string {
-  return formatMinorUnitAmount(amount, currencyFractionDigits(currencyCode))
+  return formatMinorUnitInputAmount(amount, currencyFractionDigits(currencyCode))
 }
 
 export function parseMoneyInputValue(value: string, currencyCode: string): number {
@@ -80,4 +80,16 @@ function formatMinorUnitAmount(amount: number, scale: number): string {
   if (minor === 0) return `${sign}${whole.toLocaleString()}`
   const fraction = String(minor).padStart(scale, '0')
   return `${sign}${whole.toLocaleString()}.${fraction}`
+}
+
+function formatMinorUnitInputAmount(amount: number, scale: number): string {
+  if (scale === 0) return String(amount)
+  const divisor = 10 ** scale
+  const sign = amount < 0 ? '-' : ''
+  const absoluteAmount = Math.abs(amount)
+  const whole = Math.floor(absoluteAmount / divisor)
+  const minor = absoluteAmount % divisor
+  if (minor === 0) return `${sign}${whole}`
+  const fraction = String(minor).padStart(scale, '0')
+  return `${sign}${whole}.${fraction}`
 }

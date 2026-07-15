@@ -25,9 +25,9 @@
         <h2>{{ t('budget.monthly') }}</h2>
         <input
           v-model="monthlyInput"
-          inputmode="numeric"
+          inputmode="decimal"
           min="1"
-          step="1"
+          :step="amountStep"
           type="number"
           required
           @focus="clearZeroInput('monthly')"
@@ -41,9 +41,9 @@
         <h2>{{ t('budget.annual') }}</h2>
         <input
           v-model="annualInput"
-          inputmode="numeric"
+          inputmode="decimal"
           min="1"
-          step="1"
+          :step="amountStep"
           type="number"
           required
           @focus="clearZeroInput('annual')"
@@ -68,7 +68,7 @@
         <div class="category-grid">
           <label v-for="category in categories" :key="category.id">
             <span>{{ translateLabel(category.name, t) }}</span>
-            <input v-model.number="categoryAmounts[category.name]" inputmode="numeric" min="0" step="1" type="number" />
+            <input v-model="categoryAmounts[category.name]" inputmode="decimal" min="0" :step="amountStep" type="number" />
           </label>
         </div>
         <p v-if="categoryTotal > monthlyTotal" class="warning">{{ t('budget.categoryOverWarning') }}</p>
@@ -94,9 +94,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft } from '@lucide/vue'
 
 import { getBudget, saveBudget } from '@/api/budget'
-import { listCategories, type Category } from '@/api/ledgers'
+import { getLedger, listCategories, type Category } from '@/api/ledgers'
 import AppLoadingPanel from '@/components/AppLoadingPanel.vue'
 import { translateLabel } from '@/i18n/labels'
+import { currencyFractionDigits, formatMoneyInputValue, parseMoneyInputValue } from '@/utils/money'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -110,15 +111,17 @@ const monthlyError = ref('')
 const annualError = ref('')
 const splitByCategory = ref(false)
 const categories = ref<Category[]>([])
-const categoryAmounts = reactive<Record<string, number>>({})
+const currencyCode = ref('JPY')
+const categoryAmounts = reactive<Record<string, string | number>>({})
 const isInitialLoading = ref(true)
 const isSaving = ref(false)
 const statusMessage = ref('')
 const errorMessage = ref('')
 
-const monthlyTotal = computed(() => parsePositiveInteger(monthlyInput.value) || 0)
-const annualTotal = computed(() => parsePositiveInteger(annualInput.value) || 0)
-const categoryTotal = computed(() => Object.values(categoryAmounts).reduce((sum, value) => sum + (Number(value) || 0), 0))
+const amountStep = computed(() => (currencyFractionDigits(currencyCode.value) === 0 ? '1' : '0.01'))
+const monthlyTotal = computed(() => parsePositiveMoneyInput(monthlyInput.value) || 0)
+const annualTotal = computed(() => parsePositiveMoneyInput(annualInput.value) || 0)
+const categoryTotal = computed(() => Object.values(categoryAmounts).reduce((sum, value) => sum + (parseNonNegativeMoneyInput(value) ?? 0), 0))
 const canContinue = computed(() => {
   if (step.value === 0) return monthlyTotal.value > 0
   if (step.value === 1) return annualTotal.value > 0
@@ -127,17 +130,19 @@ const canContinue = computed(() => {
 
 onMounted(async () => {
   try {
-    const [categoryRows, budget] = await Promise.all([
+    const [ledger, categoryRows, budget] = await Promise.all([
+      getLedger(ledgerId.value),
       listCategories(ledgerId.value),
       getBudget(ledgerId.value),
     ])
+    currencyCode.value = ledger.default_currency_code
     categories.value = categoryRows
     if (budget) {
-      monthlyInput.value = String(budget.monthly_total)
-      annualInput.value = String(budget.annual_total || budget.monthly_total * 12)
+      monthlyInput.value = formatMoneyInputValue(budget.monthly_total, currencyCode.value)
+      annualInput.value = formatMoneyInputValue(budget.annual_total || budget.monthly_total * 12, currencyCode.value)
       annualManuallyEdited.value = budget.annual_total !== budget.monthly_total * 12
       for (const category of budget.categories || []) {
-        categoryAmounts[category.category] = category.amount
+        categoryAmounts[category.category] = formatMoneyInputValue(category.amount, currencyCode.value)
       }
     }
   } finally {
@@ -150,13 +155,13 @@ function applyDefaultCategoryAmounts(force = false) {
   const amount = Math.floor(monthlyTotal.value / categories.value.length)
   for (const category of categories.value) {
     if (force || categoryAmounts[category.name] === undefined) {
-      categoryAmounts[category.name] = amount
+      categoryAmounts[category.name] = formatMoneyInputValue(amount, currencyCode.value)
     }
   }
 }
 
 function skipAnnual() {
-  annualInput.value = String(monthlyTotal.value * 12)
+  annualInput.value = multiplyDisplayAmount(monthlyInput.value, 12)
   annualManuallyEdited.value = false
   annualError.value = ''
   step.value = 2
@@ -171,7 +176,7 @@ async function nextOrSave() {
   if (step.value === 0) {
     if (!validateMonthly()) return
     if (!annualManuallyEdited.value) {
-      annualInput.value = String(monthlyTotal.value * 12)
+      annualInput.value = multiplyDisplayAmount(monthlyInput.value, 12)
     }
     applyDefaultCategoryAmounts(false)
     step.value = 1
@@ -201,7 +206,7 @@ async function submitBudget() {
       categories: splitByCategory.value
         ? categories.value.map((category) => ({
             category: category.name,
-            amount: Number(categoryAmounts[category.name]) || 0,
+            amount: parseNonNegativeMoneyInput(categoryAmounts[category.name]) ?? 0,
           }))
         : undefined,
     })
@@ -217,8 +222,7 @@ async function submitBudget() {
 function handleMonthlyInput() {
   monthlyError.value = ''
   if (!annualManuallyEdited.value) {
-    const monthly = parsePositiveInteger(monthlyInput.value)
-    annualInput.value = monthly ? String(monthly * 12) : ''
+    annualInput.value = parsePositiveMoneyInput(monthlyInput.value) ? multiplyDisplayAmount(monthlyInput.value, 12) : ''
   }
 }
 
@@ -232,15 +236,32 @@ function clearZeroInput(field: 'monthly' | 'annual') {
   if (field === 'annual' && Number(annualInput.value) === 0) annualInput.value = ''
 }
 
-function parsePositiveInteger(value: string | number): number | null {
+function parsePositiveMoneyInput(value: string | number): number | null {
+  const amount = parseNonNegativeMoneyInput(value)
+  return amount && amount > 0 ? amount : null
+}
+
+function parseNonNegativeMoneyInput(value: string | number): number | null {
   const normalized = String(value).trim()
-  if (!/^\d+$/.test(normalized)) return null
+  if (!normalized) return null
+  const fractionDigits = currencyFractionDigits(currencyCode.value)
+  const pattern = fractionDigits === 0 ? /^\d+$/ : new RegExp(`^\\d+(?:\\.\\d{1,${fractionDigits}})?$`)
+  if (!pattern.test(normalized)) return null
+  const amount = parseMoneyInputValue(normalized, currencyCode.value)
+  return Number.isSafeInteger(amount) && amount >= 0 ? amount : null
+}
+
+function multiplyDisplayAmount(value: string | number, multiplier: number): string {
+  const normalized = String(value).replace(/,/g, '').trim()
   const amount = Number(normalized)
-  return Number.isSafeInteger(amount) && amount > 0 ? amount : null
+  if (!Number.isFinite(amount) || amount <= 0) return ''
+  const fractionDigits = currencyFractionDigits(currencyCode.value)
+  const multiplied = amount * multiplier
+  return fractionDigits === 0 ? String(Math.round(multiplied)) : multiplied.toFixed(fractionDigits).replace(/\.?0+$/, '')
 }
 
 function validateMonthly(): boolean {
-  if (parsePositiveInteger(monthlyInput.value)) {
+  if (parsePositiveMoneyInput(monthlyInput.value)) {
     monthlyError.value = ''
     return true
   }
@@ -249,7 +270,7 @@ function validateMonthly(): boolean {
 }
 
 function validateAnnual(): boolean {
-  if (parsePositiveInteger(annualInput.value)) {
+  if (parsePositiveMoneyInput(annualInput.value)) {
     annualError.value = ''
     return true
   }
@@ -260,8 +281,8 @@ function validateAnnual(): boolean {
 function validateCategoryAmounts(): boolean {
   if (!splitByCategory.value) return true
   const isValid = categories.value.every((category) => {
-    const amount = Number(categoryAmounts[category.name])
-    return Number.isSafeInteger(amount) && amount >= 0
+    const amount = parseNonNegativeMoneyInput(categoryAmounts[category.name])
+    return amount !== null
   })
   if (!isValid) errorMessage.value = t('errors.validationError')
   return isValid

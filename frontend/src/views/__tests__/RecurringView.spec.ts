@@ -3,24 +3,12 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import RecurringView from '@/views/RecurringView.vue'
+import { getLedger } from '@/api/ledgers'
 import { createRecurringTemplate, deleteRecurringTemplate, updateRecurringTemplate } from '@/api/recurring'
+import RecurringView from '@/views/RecurringView.vue'
 
 vi.mock('@/api/ledgers', () => ({
-  getLedger: vi.fn(async () => ({
-    id: 'ledger-1',
-    owner_id: 'user-1',
-    name: 'Home',
-    entry_mode: 'receipt',
-    subject_enabled: false,
-    subject_step_mode: 'disabled',
-    necessity_step_mode: 'required',
-    default_currency_code: 'JPY',
-    timezone: 'Asia/Tokyo',
-    budget_enabled: false,
-    created_at: '',
-    updated_at: '',
-  })),
+  getLedger: vi.fn(),
   updateLedger: vi.fn(),
   listCategories: vi.fn(async () => [
     { id: 'cat-1', ledger_id: 'ledger-1', name: 'category.food', is_system: true, display_order: 0 },
@@ -40,7 +28,7 @@ const templates = vi.hoisted(() => [
       amount: 50000,
       currency_code: 'JPY',
       necessity: 'essential',
-      items: [{ category_name: 'category.other', item_name: '家賃', amount: 50000, currency_code: 'JPY' }],
+      items: [{ category_name: 'category.other', item_name: 'Rent', amount: 50000, currency_code: 'JPY' }],
       subject_ids: [],
     },
     created_at: '',
@@ -77,6 +65,43 @@ vi.mock('@/api/recurring', () => ({
   }),
 }))
 
+function mockLedger(currencyCode = 'JPY') {
+  vi.mocked(getLedger).mockResolvedValue({
+    id: 'ledger-1',
+    owner_id: 'user-1',
+    name: 'Home',
+    entry_mode: 'receipt',
+    subject_enabled: false,
+    subject_step_mode: 'disabled',
+    necessity_step_mode: 'required',
+    default_currency_code: currencyCode,
+    timezone: 'Asia/Tokyo',
+    budget_enabled: false,
+    created_at: '',
+    updated_at: '',
+  })
+}
+
+function resetTemplates() {
+  templates.splice(0, templates.length, {
+    id: 'recurring-1',
+    ledger_id: 'ledger-1',
+    created_by: 'user-1',
+    interval: 'monthly',
+    next_run_date: '2026-07-01',
+    is_active: true,
+    template_data: {
+      amount: 50000,
+      currency_code: 'JPY',
+      necessity: 'essential',
+      items: [{ category_name: 'category.other', item_name: 'Rent', amount: 50000, currency_code: 'JPY' }],
+      subject_ids: [],
+    },
+    created_at: '',
+    updated_at: '',
+  })
+}
+
 function makeRouter() {
   return createRouter({
     history: createWebHistory(),
@@ -87,42 +112,32 @@ function makeRouter() {
   })
 }
 
+async function mountView() {
+  const router = makeRouter()
+  router.push('/ledgers/ledger-1/recurring')
+  await router.isReady()
+  const wrapper = mount(RecurringView, { global: { plugins: [router] } })
+  await vi.waitFor(() => expect(wrapper.find('.template-list li').exists()).toBe(true))
+  return wrapper
+}
+
 describe('RecurringView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
-    templates.splice(0, templates.length, {
-      id: 'recurring-1',
-      ledger_id: 'ledger-1',
-      created_by: 'user-1',
-      interval: 'monthly',
-      next_run_date: '2026-07-01',
-      is_active: true,
-      template_data: {
-        amount: 50000,
-        currency_code: 'JPY',
-        necessity: 'essential',
-        items: [{ category_name: 'category.other', item_name: '家賃', amount: 50000, currency_code: 'JPY' }],
-        subject_ids: [],
-      },
-      created_at: '',
-      updated_at: '',
-    })
+    mockLedger()
+    resetTemplates()
   })
 
   it('creates, toggles, and deletes recurring templates', async () => {
-    const router = makeRouter()
-    router.push('/ledgers/ledger-1/recurring')
-    await router.isReady()
-    const wrapper = mount(RecurringView, { global: { plugins: [router] } })
-    await vi.waitFor(() => expect(wrapper.text()).toContain('家賃'))
+    const wrapper = await mountView()
 
     await wrapper.find('.top-icon-button.primary').trigger('click')
     await wrapper.find('input[type="number"]').setValue('1200')
     await wrapper.find('input[type="date"]').setValue('2026-07-10')
     await wrapper.findAll('select')[0].setValue('weekly')
     await wrapper.findAll('select')[1].setValue('category.food')
-    await wrapper.find('input[maxlength="100"]').setValue('米')
+    await wrapper.find('input[maxlength="100"]').setValue('Rice')
     await wrapper.find('form').trigger('submit')
 
     await vi.waitFor(() => expect(createRecurringTemplate).toHaveBeenCalledTimes(1))
@@ -133,15 +148,15 @@ describe('RecurringView', () => {
         amount: 1200,
         currency_code: 'JPY',
         necessity: 'essential',
-        items: [{ category_name: 'category.food', item_name: '米', amount: 1200, currency_code: 'JPY' }],
+        items: [{ category_name: 'category.food', item_name: 'Rice', amount: 1200, currency_code: 'JPY' }],
         subject_ids: [],
       },
     })
 
-    await wrapper.find('.template-list button[aria-label="停用"]').trigger('click')
+    await wrapper.findAll('.template-list .icon-action')[0].trigger('click')
     await vi.waitFor(() => expect(updateRecurringTemplate).toHaveBeenCalledWith('ledger-1', 'recurring-1', { is_active: false }))
 
-    await wrapper.find('.template-list button[aria-label="启用"]').trigger('click')
+    await wrapper.findAll('.template-list .icon-action')[0].trigger('click')
     await vi.waitFor(() => expect(updateRecurringTemplate).toHaveBeenCalledWith('ledger-1', 'recurring-1', { is_active: true }))
 
     await wrapper.find('.danger-button').trigger('click')
@@ -149,13 +164,9 @@ describe('RecurringView', () => {
   })
 
   it('edits an existing recurring template', async () => {
-    const router = makeRouter()
-    router.push('/ledgers/ledger-1/recurring')
-    await router.isReady()
-    const wrapper = mount(RecurringView, { global: { plugins: [router] } })
-    await vi.waitFor(() => expect(wrapper.text()).toContain('家賃'))
+    const wrapper = await mountView()
 
-    await wrapper.find('.template-list button[aria-label="编辑"]').trigger('click')
+    await wrapper.findAll('.template-list .icon-action')[1].trigger('click')
     await wrapper.find('input[type="number"]').setValue('60000')
     await wrapper.findAll('select')[0].setValue('yearly')
     await wrapper.find('form').trigger('submit')
@@ -168,9 +179,29 @@ describe('RecurringView', () => {
         amount: 60000,
         currency_code: 'JPY',
         necessity: 'essential',
-        items: [{ category_name: 'category.other', item_name: '家賃', amount: 60000, currency_code: 'JPY' }],
+        items: [{ category_name: 'category.other', item_name: 'Rent', amount: 60000, currency_code: 'JPY' }],
         subject_ids: [],
       },
     })
+  })
+
+  it('submits decimal-currency recurring amounts in minor units', async () => {
+    mockLedger('USD')
+    const wrapper = await mountView()
+
+    await wrapper.find('.top-icon-button.primary').trigger('click')
+    await wrapper.find('input[type="number"]').setValue('96.50')
+    await wrapper.find('input[type="date"]').setValue('2026-07-10')
+    await wrapper.findAll('select')[1].setValue('category.food')
+    await wrapper.find('form').trigger('submit')
+
+    await vi.waitFor(() => expect(createRecurringTemplate).toHaveBeenCalledTimes(1))
+    expect(createRecurringTemplate).toHaveBeenLastCalledWith('ledger-1', expect.objectContaining({
+      template_data: expect.objectContaining({
+        amount: 9650,
+        currency_code: 'USD',
+        items: [expect.objectContaining({ amount: 9650, currency_code: 'USD' })],
+      }),
+    }))
   })
 })
