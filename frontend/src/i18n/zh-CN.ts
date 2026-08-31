@@ -191,7 +191,7 @@ export default {
     annual: '年度总预算',
     categoryBudget: '分类预算',
     skipDefault: '跳过，使用默认设置',
-    warning80: '已使用预算的 80%',
+    warning80: '已使用预算的 {percent}',
     warning100: '已超出预算！',
     categoryOverWarning: '分类预算合计已超过月度总预算，但仍可保存',
     positiveAmountError: '请输入大于零的整数金额',

@@ -180,6 +180,8 @@ describe('LedgerDetail', () => {
     expect(wrapper.find('.topbar .record-button').exists()).toBe(true)
     expect(wrapper.find('.budget-panel.soft').exists()).toBe(true)
     expect(wrapper.find('.budget-panel').text()).toContain('本月支出进度（85%）')
+    expect(wrapper.find('.budget-warning').text()).toContain('85%')
+    expect(wrapper.find('.budget-warning').text()).not.toContain('80%')
     expect(wrapper.text()).not.toContain('消费记录 ·')
     expect(wrapper.text()).toContain('本月合计')
     expect(wrapper.find('.records-section').exists()).toBe(true)
