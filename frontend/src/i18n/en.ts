@@ -279,7 +279,7 @@ export default {
     annual: 'Annual Budget',
     categoryBudget: 'Category Budget',
     skipDefault: 'Skip, use defaults',
-    warning80: '80% of budget used',
+    warning80: '{percent} of budget used',
     warning100: 'Over budget!',
     categoryOverWarning: 'Category budgets exceed the monthly total, but you can still save',
     positiveAmountError: 'Enter a whole number greater than zero',
