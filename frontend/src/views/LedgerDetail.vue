@@ -75,7 +75,9 @@
             height="10"
             rounded
           />
-          <p v-if="budget.progress.warning === 'soft'" class="budget-warning">{{ t('budget.warning80') }}</p>
+          <p v-if="budget.progress.warning === 'soft'" class="budget-warning">
+            {{ t('budget.warning80', { percent: budgetProgressPercentage }) }}
+          </p>
           <p v-else-if="budget.progress.warning === 'over'" class="budget-warning">{{ t('budget.warning100') }}</p>
         </v-card-text>
       </v-card>

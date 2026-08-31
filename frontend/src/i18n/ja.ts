@@ -191,7 +191,7 @@ export default {
     annual: '年間予算',
     categoryBudget: 'カテゴリ別予算',
     skipDefault: 'スキップしてデフォルトを使用',
-    warning80: '予算の80%を使用しました',
+    warning80: '予算の{percent}を使用しました',
     warning100: '予算を超えました！',
     categoryOverWarning: 'カテゴリ別予算の合計が月間予算を超えていますが、保存できます',
     positiveAmountError: '0より大きい整数を入力してください',
